@@ -5,6 +5,8 @@
  * COPYING file.
 **/
 
+in_module(null);
+
 require("interactive.js");
 require("io.js");
 
@@ -105,8 +107,9 @@ const STDERR_FILENO = 2;
 
 var spawn_process_helper_default_fd_wait_timeout = 1000;
 var spawn_process_helper_setup_timeout = 2000;
-var spawn_process_helper_program = file_locator.get("CurProcD", Ci.nsIFile);
+var spawn_process_helper_program = file_locator_service.get("CurProcD", Ci.nsIFile);
 spawn_process_helper_program.append("conkeror-spawn-helper.exe");
+spawn_process_helper_program.append("conkeror-spawn-helper");
 
 /**
  * @param program_name
@@ -540,7 +543,7 @@ function spawn_process_blind (program_name, args) {
 
 //  Keyword arguments: $cwd, $fds
 function spawn_and_wait_for_process (program_name, args) {
-    keywords(arguments);
+    keywords(arguments, $cwd = null, $fds = null);
     var cc = yield CONTINUATION;
     spawn_process(program_name, args, arguments.$cwd,
                   cc, cc.throw,
@@ -637,3 +640,5 @@ function shell_command (command) {
 function shell_command_with_argument (command, arg) {
     yield co_return((yield shell_command(substitute_shell_command_argument(command, arg), forward_keywords(arguments))));
 }
+
+provide("spawn-process");

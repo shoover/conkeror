@@ -9,6 +9,8 @@
  * COPYING file.
 **/
 
+in_module(null);
+
 require("hints.js");
 require("save.js");
 require("mime-type-override.js");
@@ -128,12 +130,13 @@ define_browser_object_class("links",
     "Browser object class for selecting a hyperlink, form field, "+
     "or link-like element, via hinting.",
     xpath_browser_object_handler(
-        "//*[@onclick or @onmouseover or @onmousedown or @onmouseup or @oncommand or @role='link'] | " +
+        "//*[@onclick or @onmouseover or @onmousedown or @onmouseup or @oncommand or @role='link' or @role='button' or @role='menuitem'] | " +
         "//input[not(@type='hidden')] | //a | //area | //iframe | //textarea | //button | //select | " +
         "//*[@contenteditable = 'true'] |" +
-        "//xhtml:*[@onclick or @onmouseover or @onmousedown or @onmouseup or @oncommand or @role='link'] | " +
+        "//xhtml:*[@onclick or @onmouseover or @onmousedown or @onmouseup or @oncommand or @role='link' or @role='button' or @role='menuitem'] | " +
         "//xhtml:input[not(@type='hidden')] | //xhtml:a | //xhtml:area | //xhtml:iframe | //xhtml:textarea | //xhtml:button | //xhtml:select | " +
-        "//xhtml:*[@contenteditable = 'true']"),
+        "//xhtml:*[@contenteditable = 'true'] | "+
+        "//svg:a"),
     $hint = "select link");
 
 define_browser_object_class("mathml",
@@ -253,6 +256,17 @@ define_browser_object_class("dom-node", null,
     xpath_browser_object_handler("//* | //xhtml:*"),
     $hint = "select DOM node");
 
+define_browser_object_class("fragment-link",
+    "Browser object class which returns a link to the specified fragment of a page",
+    function (I, prompt) {
+        var elem = yield I.buffer.window.minibuffer.read_hinted_element(
+            $buffer = I.buffer,
+            $prompt = prompt,
+            $hint_xpath_expression = "//*[@id] | //a[@name] | //xhtml:*[@id] | //xhtml:a[@name]");
+        yield co_return(page_fragment_load_spec(elem));
+    },
+    $hint = "select element to link to");
+
 interactive("browser-object-text",
     "Composable browser object which returns the text of another object.",
     function (I) {
@@ -304,6 +318,8 @@ function read_browser_object (I) {
  */
 function browser_set_element_focus (buffer, elem, prevent_scroll) {
     if (!element_dom_node_or_window_p(elem))
+        return;
+    if (! elem.focus)
         return;
     if (prevent_scroll)
         set_focus_no_scroll(buffer.window, elem);
@@ -431,6 +447,11 @@ function dom_node_click (elem, x, y) {
 
     evt = doc.createEvent("MouseEvents");
     evt.initMouseEvent("click", true, true, view, 1, x, y, 0, 0, /*ctrl*/ 0, /*event.altKey*/0,
+                       /*event.shiftKey*/ 0, /*event.metaKey*/ 0, 0, null);
+    elem.dispatchEvent(evt);
+
+    evt = doc.createEvent("MouseEvents");
+    evt.initMouseEvent("mouseup", true, true, view, 1, x, y, 0, 0, /*ctrl*/ 0, /*event.altKey*/0,
                        /*event.shiftKey*/ 0, /*event.metaKey*/ 0, 0, null);
     elem.dispatchEvent(evt);
 }
@@ -580,7 +601,9 @@ function browser_object_view_source (buffer, target, elem) {
             browser_object_follow(buffer, target, "view-source:" + url_s);
         } catch(e) { dump_error(e); }
     } else {
-        window.minibuffer.message ("Already viewing source");
+        try {
+            browser_object_follow(buffer, target, url_s.replace(/^view-source\:/, ''));
+        } catch(e) { dump_error(e); }
     }
 }
 
@@ -609,3 +632,4 @@ function browser_element_shell_command (buffer, elem, command, cwd) {
                                 $shell_command_cwd = cwd);
 }
 
+provide("element");

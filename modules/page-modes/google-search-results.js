@@ -6,6 +6,8 @@
  * COPYING file.
 **/
 
+in_module(null);
+
 require("content-buffer.js");
 
 
@@ -23,7 +25,7 @@ define_key(google_search_results_keymap, "return", "ensure-content-focused", $fa
  */
 
 define_browser_object_class("google-search-results-links", null,
-    xpath_browser_object_handler("//a[@class='l']"),
+    xpath_browser_object_handler("//a[@class='l']|//a[@class='l vst']"),
     $hint = "select search result");
 
 
@@ -87,3 +89,4 @@ let (google_search_re = build_url_regex(
     auto_mode_list.push([google_search_re, google_search_results_mode]);
 };
 
+provide("google-search-results");

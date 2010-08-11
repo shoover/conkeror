@@ -52,7 +52,24 @@
  *                                          Defaults to true.
  */
 
+in_module(null);
+
 require("webjump.js");
+
+function page_fragment_load_spec (elem) {
+    var uri = makeURLAbsolute(elem.ownerDocument.documentURI,
+                              "#" + (elem.id || elem.name));
+    var title = elem.ownerDocument.title;
+    if (elem.textContent) {
+        if (title) title += ' - ';
+        title += elem.textContent;
+    }
+    return {
+        uri: uri,
+        element: elem,
+        title: title
+    };
+}
 
 function load_spec_from_element (elem) {
     var spec = {};
@@ -67,16 +84,22 @@ function load_spec_from_element (elem) {
         var url = null;
         var title = null;
 
-        if (elem instanceof Ci.nsIDOMHTMLAnchorElement ||
-            elem instanceof Ci.nsIDOMHTMLAreaElement ||
-            elem instanceof Ci.nsIDOMHTMLLinkElement) {
-            if (elem.hasAttribute("href"))
-                url = elem.href;
+        if ((elem instanceof Ci.nsIDOMHTMLAnchorElement ||
+             elem instanceof Ci.nsIDOMHTMLAreaElement ||
+             elem instanceof Ci.nsIDOMHTMLLinkElement) &&
+	    elem.hasAttribute("href"))
+        {
+            url = elem.href;
             title = elem.title || elem.textContent;
         }
         else if (elem instanceof Ci.nsIDOMHTMLImageElement) {
             url = elem.src;
             title = elem.title || elem.alt;
+        }
+        else if (elem.hasAttribute("id") ||
+                 (elem instanceof Ci.nsIDOMHTMLAnchorElement &&
+                  elem.hasAttribute("name"))) {
+            return page_fragment_load_spec(elem);
         }
         else {
             var node = elem;
@@ -133,7 +156,10 @@ function load_spec (x) {
     spec.__proto__ = load_spec.prototype;
     return spec;
 }
-load_spec.prototype = {};
+load_spec.prototype = {
+    constructor: load_spec,
+    toString: function () "[object load_spec]"
+};
 
 function load_spec_document (x) {
     return x.document;
@@ -329,3 +355,5 @@ function apply_load_spec (target, spec) {
         }
     }
 }
+
+provide("load-spec");

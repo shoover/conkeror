@@ -1,21 +1,21 @@
 Source: conkeror
 Section: web
 Priority: extra
-Maintainer: Axel Beckert <abe@deuxchevaux.org>
-Uploaders: Luca Capello <luca@pca.it>
-Build-Depends: debhelper (>= 7), quilt
-Standards-Version: 3.8.3
+Maintainer: Axel Beckert <abe@debian.org>
+Build-Depends: debhelper (>= 7.2.3~), quilt
+Standards-Version: 3.9.1
 Homepage: http://conkeror.org/
 Vcs-Browser: http://repo.or.cz/w/conkeror.git
 Vcs-Git: git://repo.or.cz/conkeror.git
 
 Package: conkeror
 Architecture: all
-Depends: xulrunner (>= 1.9~) | xulrunner-1.9 | xulrunner-1.9.1, ${misc:Depends}
+Depends: xulrunner-1.9.1 | xulrunner-1.9.2 | xulrunner-1.9 | xulrunner (>= 1.9~), ${misc:Depends}
 Recommends: conkeror-spawn-process-helper
-Conflicts: conkeror-spawn-process-helper (<< 0.9~git080901-1)
+Breaks: conkeror-spawn-process-helper (<< 0.9~git080901-1)
 Suggests: emacs | emacsen
 Provides: www-browser
+Xb-Xul-AppId: {a79fe89b-6662-4ff4-8e88-09950ad4dfde}
 Description: keyboard focused web browser with Emacs look and feel
  Conkeror is a highly-programmable web browser based on Mozilla
  XULRunner. It has a sophisticated keyboard system for running
@@ -35,7 +35,7 @@ Package: conkeror-spawn-process-helper
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Suggests: conkeror
-Conflicts: conkeror (<< 0.9~git080901-1)
+Breaks: conkeror (<< 0.9~git080901-1)
 Description: spawn external processes in Conkeror
  This helper tool named conkeror-spawn-helper is necessary to let the
  Conkeror web browser spawn external process, e.g. to edit form fields

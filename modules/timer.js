@@ -5,10 +5,13 @@
  * COPYING file.
 **/
 
+in_module(null);
+
 function timer_callback (callback) {
     this.callback = callback;
 }
 timer_callback.prototype = {
+    constructor: timer_callback,
     QueryInterface: XPCOMUtils.generateQI([Ci.nsITimerCallback]),
 
     notify: function (timer) {
@@ -37,3 +40,5 @@ function call_at_precise_interval (callback, interval) {
 function timer_cancel (timer) {
     timer.cancel();
 }
+
+provide("timer");

@@ -2,57 +2,17 @@
  * (C) Copyright 2004-2005 Shawn Betts
  * (C) Copyright 2007-2008 Jeremy Maitin-Shepard
  * (C) Copyright 2008 Nelson Elhage
- * (C) Copyright 2008-2009 John Foerch
+ * (C) Copyright 2008-2010 John Foerch
  *
  * Use, modification, and distribution are subject to the terms specified in the
  * COPYING file.
 **/
 
-const CARET_ATTRIBUTE = 'showcaret';
+in_module(null);
 
 define_variable("isearch_keep_selection", false,
     "Set to `true' to make isearch leave the selection visible when a "+
     "search is completed.");
-
-function caret_enabled (buffer) {
-    return buffer.browser.getAttribute(CARET_ATTRIBUTE);
-}
-
-// turn on the selection in all frames
-function getFocusedSelCtrl (buffer) {
-    var ds = buffer.doc_shell;
-    var dsEnum = ds.getDocShellEnumerator(Ci.nsIDocShellTreeItem.typeContent,
-                                          Ci.nsIDocShell.ENUMERATE_FORWARDS);
-    while (dsEnum.hasMoreElements()) {
-        ds = dsEnum.getNext().QueryInterface(Ci.nsIDocShell);
-        if (ds.hasFocus) {
-            var display = ds.QueryInterface(Ci.nsIInterfaceRequestor)
-                .getInterface(Ci.nsISelectionDisplay);
-            if (!display)
-                return null;
-            return display.QueryInterface(Ci.nsISelectionController);
-        }
-    }
-
-    // One last try
-    return ds
-        .QueryInterface(Ci.nsIInterfaceRequestor)
-        .getInterface(Ci.nsISelectionDisplay)
-        .QueryInterface(Ci.nsISelectionController);
-}
-
-function clear_selection (buffer) {
-    let sel_ctrl = getFocusedSelCtrl(buffer);
-    if (sel_ctrl) {
-        let sel = sel_ctrl.getSelection(sel_ctrl.SELECTION_NORMAL);
-        if (caret_enabled(buffer)) {
-            if (sel.anchorNode)
-                sel.collapseToStart();
-        } else {
-            sel.removeAllRanges();
-        }
-    }
-}
 
 
 function initial_isearch_state (buffer, frame, forward) {
@@ -73,45 +33,43 @@ function initial_isearch_state (buffer, frame, forward) {
     this.direction = forward;
 }
 
-function isearch_session (window, forward) {
+function isearch_session (minibuffer, forward) {
+    minibuffer_input_state.call(this, minibuffer, isearch_keymap, "");
     this.states = [];
-    this.buffer = window.buffers.current;
+    this.buffer = this.minibuffer.window.buffers.current;
     this.frame = this.buffer.focused_frame;
-    this.sel_ctrl = getFocusedSelCtrl(this.buffer);
+    this.sel_ctrl = this.buffer.focused_selection_controller;
     this.sel_ctrl.setDisplaySelection(Ci.nsISelectionController.SELECTION_ATTENTION);
     this.sel_ctrl.repaintSelection(Ci.nsISelectionController.SELECTION_NORMAL);
     this.states.push(new initial_isearch_state(this.buffer, this.frame, forward));
-    this.window = window;
-
-    minibuffer_input_state.call(this, window, isearch_keymap, "");
 }
 isearch_session.prototype = {
-    constructor : isearch_session,
-    __proto__ : minibuffer_input_state.prototype,
+    constructor: isearch_session,
+    __proto__: minibuffer_input_state.prototype,
 
     get top () {
         return this.states[this.states.length - 1];
     },
-    _set_selection : function (range) {
-        try {
-            const selctrlcomp = Ci.nsISelectionController;
-            var sel = this.sel_ctrl.getSelection(selctrlcomp.SELECTION_NORMAL);
-            sel.removeAllRanges();
-            sel.addRange(range.cloneRange());
-            this.sel_ctrl.scrollSelectionIntoView(selctrlcomp.SELECTION_NORMAL,
-                                                  selctrlcomp.SELECTION_FOCUS_REGION,
-                                                  true);
-        } catch(e) {/*FIXME:figure out if/why this is needed*/ dumpln("setSelection: " + e);}
+    _set_selection: function (range) {
+        const selctrlcomp = Ci.nsISelectionController;
+        var sel = this.sel_ctrl.getSelection(selctrlcomp.SELECTION_NORMAL);
+        sel.removeAllRanges();
+        sel.addRange(range.cloneRange());
+        this.sel_ctrl.scrollSelectionIntoView(selctrlcomp.SELECTION_NORMAL,
+                                              selctrlcomp.SELECTION_FOCUS_REGION,
+                                              true);
     },
-    _clear_selection : function () {
+    _clear_selection: function () {
         const selctrlcomp = Ci.nsISelectionController;
         var sel = this.sel_ctrl.getSelection(selctrlcomp.SELECTION_NORMAL);
         sel.removeAllRanges();
     },
     restore_state: function () {
-        var m = this.window.minibuffer;
+        var m = this.minibuffer;
         var s = this.top;
+        m.ignore_input_events = true;
         m._input_text = s.search_str;
+        m.ignore_input_events = false;
         if (s.selection)
             this._set_selection(s.selection);
         else
@@ -121,99 +79,93 @@ isearch_session.prototype = {
                     + (s.range ? "" : "Failing ")
                     + "I-Search" + (s.direction? "": " backward") + ":");
     },
-    _highlight_find : function (str, wrapped, dir, pt) {
-        try {
-            var doc = this.frame.document;
-            var finder = (Cc["@mozilla.org/embedcomp/rangefind;1"]
-                          .createInstance()
-                          .QueryInterface(Ci.nsIFind));
-            var searchRange;
-            var startPt;
-            var endPt;
-            var body = doc.documentElement;
+    _highlight_find: function (str, wrapped, dir, pt) {
+        var doc = this.frame.document;
+        var finder = (Cc["@mozilla.org/embedcomp/rangefind;1"]
+                      .createInstance()
+                      .QueryInterface(Ci.nsIFind));
+        var searchRange;
+        var startPt;
+        var endPt;
+        var body = doc.documentElement;
 
-            finder.findBackwards = !dir;
+        finder.findBackwards = !dir;
 
-            searchRange = doc.createRange();
-            startPt = doc.createRange();
-            endPt = doc.createRange();
+        searchRange = doc.createRange();
+        startPt = doc.createRange();
+        endPt = doc.createRange();
 
-            var count = body.childNodes.length;
+        var count = body.childNodes.length;
 
-            // Search range in the doc
-            searchRange.setStart(body,0);
-            searchRange.setEnd(body, count);
+        // Search range in the doc
+        searchRange.setStart(body,0);
+        searchRange.setEnd(body, count);
 
-            if (!dir) {
-                if (pt == null) {
-                    startPt.setStart(body, count);
-                    startPt.setEnd(body, count);
-                } else {
-                    startPt.setStart(pt.startContainer, pt.startOffset);
-                    startPt.setEnd(pt.startContainer, pt.startOffset);
-                }
-                endPt.setStart(body, 0);
-                endPt.setEnd(body, 0);
+        if (!dir) {
+            if (pt == null) {
+                startPt.setStart(body, count);
+                startPt.setEnd(body, count);
             } else {
-                if (pt == null) {
-                    startPt.setStart(body, 0);
-                    startPt.setEnd(body, 0);
-                } else {
-                    startPt.setStart(pt.endContainer, pt.endOffset);
-                    startPt.setEnd(pt.endContainer, pt.endOffset);
-                }
-                endPt.setStart(body, count);
-                endPt.setEnd(body, count);
+                startPt.setStart(pt.startContainer, pt.startOffset);
+                startPt.setEnd(pt.startContainer, pt.startOffset);
             }
-            // search the doc
-            var retRange = null;
-            var selectionRange = null;
-
-
-            if (!wrapped) {
-                do {
-                    retRange = finder.Find(str, searchRange, startPt, endPt);
-                    var keepSearching = false;
-                    if (retRange) {
-                        var sc = retRange.startContainer;
-                        var ec = retRange.endContainer;
-                        var scp = sc.parentNode;
-                        var ecp = ec.parentNode;
-                        var sy1 = abs_point(scp).y;
-                        var ey2 = abs_point(ecp).y + ecp.offsetHeight;
-
-                        startPt = retRange.startContainer.ownerDocument.createRange();
-                        if (!dir) {
-                            startPt.setStart(retRange.startContainer, retRange.startOffset);
-                            startPt.setEnd(retRange.startContainer, retRange.startOffset);
-                        } else {
-                            startPt.setStart(retRange.endContainer, retRange.endOffset);
-                            startPt.setEnd(retRange.endContainer, retRange.endOffset);
-                        }
-                        // We want to find a match that is completely
-                        // visible, otherwise the view will scroll just a
-                        // bit to fit the selection in completely.
-                        keepSearching = (dir && sy1 < this.frame.scrollY)
-                            || (!dir && ey2 >= this.frame.scrollY + this.frame.innerHeight);
-                    }
-                } while (retRange && keepSearching);
+            endPt.setStart(body, 0);
+            endPt.setEnd(body, 0);
+        } else {
+            if (pt == null) {
+                startPt.setStart(body, 0);
+                startPt.setEnd(body, 0);
             } else {
+                startPt.setStart(pt.endContainer, pt.endOffset);
+                startPt.setEnd(pt.endContainer, pt.endOffset);
+            }
+            endPt.setStart(body, count);
+            endPt.setEnd(body, count);
+        }
+        // search the doc
+        var retRange = null;
+        var selectionRange = null;
+
+        if (!wrapped) {
+            do {
                 retRange = finder.Find(str, searchRange, startPt, endPt);
-            }
+                var keepSearching = false;
+                if (retRange) {
+                    var sc = retRange.startContainer;
+                    var ec = retRange.endContainer;
+                    var scp = sc.parentNode;
+                    var ecp = ec.parentNode;
+                    var sy1 = abs_point(scp).y;
+                    var ey2 = abs_point(ecp).y + ecp.offsetHeight;
 
-            if (retRange) {
-                this._set_selection(retRange);
-                selectionRange = retRange.cloneRange();
-            } else {
+                    startPt = retRange.startContainer.ownerDocument.createRange();
+                    if (!dir) {
+                        startPt.setStart(retRange.startContainer, retRange.startOffset);
+                        startPt.setEnd(retRange.startContainer, retRange.startOffset);
+                    } else {
+                        startPt.setStart(retRange.endContainer, retRange.endOffset);
+                        startPt.setEnd(retRange.endContainer, retRange.endOffset);
+                    }
+                    // We want to find a match that is completely
+                    // visible, otherwise the view will scroll just a
+                    // bit to fit the selection in completely.
+                    keepSearching = (dir && sy1 < this.frame.scrollY)
+                        || (!dir && ey2 >= this.frame.scrollY + this.frame.innerHeight);
+                }
+            } while (retRange && keepSearching);
+        } else {
+            retRange = finder.Find(str, searchRange, startPt, endPt);
+        }
 
-            }
+        if (retRange) {
+            this._set_selection(retRange);
+            selectionRange = retRange.cloneRange();
+        }
 
-            return selectionRange;
-        } catch(e) { /* FIXME: figure out why this is needed*/ this.window.alert(e); }
-        return null;
+        return selectionRange;
     },
 
-    find : function (str, dir, pt) {
+    find: function (str, dir, pt) {
         var s = this.top;
 
         if (str == null || str.length == 0)
@@ -244,25 +196,23 @@ isearch_session.prototype = {
         this.states.push(new_state);
     },
 
-    focus_link : function () {
+    focus_link: function () {
         var sel = this.frame.getSelection(Ci.nsISelectionController.SELECTION_NORMAL);
         if (!sel)
             return;
         var node = sel.focusNode;
         if (node == null)
             return;
-
         do {
-            if (node.localName == "A") {
+            if (node.localName && node.localName.toLowerCase() == "a") {
                 if (node.hasAttributes && node.attributes.getNamedItem("href")) {
                     // if there is a selection, preserve it.  it is up
                     // to the caller to decide whether or not to keep
                     // the selection.
                     var sel = this.frame.getSelection(
                         Ci.nsISelectionController.SELECTION_NORMAL);
-                    if(sel.rangeCount > 0) {
+                    if (sel.rangeCount > 0)
                         var stored_selection = sel.getRangeAt(0).cloneRange();
-                    }
                     node.focus();
                     if (stored_selection) {
                         sel.removeAllRanges();
@@ -274,37 +224,35 @@ isearch_session.prototype = {
         } while ((node = node.parentNode));
     },
 
-    collapse_selection : function() {
+    collapse_selection: function() {
         const selctrlcomp = Ci.nsISelectionController;
         var sel = this.sel_ctrl.getSelection(selctrlcomp.SELECTION_NORMAL);
-        if(sel.rangeCount > 0) {
+        if (sel.rangeCount > 0)
             sel.getRangeAt(0).collapse(true);
-        }
     },
 
-    handle_input : function (m) {
+    handle_input: function (m) {
         m._set_selection();
         this.find(m._input_text, this.top.direction, this.top.point);
         this.restore_state();
     },
 
-    done : false,
+    done: false,
 
-    destroy : function (window) {
-        if (!this.done)  {
+    destroy: function () {
+        if (! this.done) {
             this.frame.scrollTo(this.states[0].screenx, this.states[0].screeny);
-            if (caret_enabled(this.buffer) && this.states[0].caret) {
+            if (caret_enabled(this.buffer) && this.states[0].caret)
                 this._set_selection(this.states[0].caret);
-            } else {
+            else
                 this._clear_selection();
-            }
         }
-        minibuffer_input_state.prototype.destroy.call(this, window);
+        minibuffer_input_state.prototype.destroy.call(this);
     }
 };
 
 function isearch_continue_noninteractively (window, direction) {
-    var s = new isearch_session(window, direction);
+    var s = new isearch_session(window.minibuffer, direction);
     if (window.isearch_last_search)
         s.find(window.isearch_last_search, direction, s.top.point);
     else
@@ -313,7 +261,7 @@ function isearch_continue_noninteractively (window, direction) {
     s.restore_state();
     // if (direction && s.top.point !== null)
     //    isearch_continue (window, direction);
-    isearch_done (window, true);
+    isearch_done(window, true);
 }
 
 function isearch_continue (window, direction) {
@@ -336,7 +284,7 @@ interactive("isearch-continue-backward", null,
             function (I) { isearch_continue(I.window, false); });
 
 function isearch_start (window, direction) {
-    var s = new isearch_session(window, direction);
+    var s = new isearch_session(window.minibuffer, direction);
     window.minibuffer.push_state(s);
     s.restore_state();
 }
@@ -376,3 +324,5 @@ function isearch_done (window, keep_selection) {
 }
 interactive("isearch-done", null,
             function (I) { isearch_done(I.window); });
+
+provide("isearch");

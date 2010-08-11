@@ -5,40 +5,35 @@
  * COPYING file.
 **/
 
-require("window.js");
-require("utils.js");
+in_module(null);
 
-if (!extension_is_enabled("{d10d0bf8-f5b5-c8b4-a8b2-2b9879e08c5d}"))
-    throw skip_module_load;
+var adblockplus_service = Cc["@mozilla.org/adblockplus;1"]
+    .createInstance().wrappedJSObject;
 
-var adblockplus_service = Cc["@mozilla.org/adblockplus;1"].createInstance().wrappedJSObject;
-
-function adblockplus_settings(buffer, uri_string) {
+function adblockplus_settings (buffer, uri_string) {
     var frame = null;
     if (buffer)
         frame = buffer.top_frame;
-
     adblockplus_service.openSettingsDialog(frame, uri_string);
 }
-interactive("adblockplus-settings", "Show the Adblock Plus settings dialog.",
-            function (I) { adblockplus_settings(I.buffer); });
+interactive("adblockplus-settings",
+    "Show the Adblock Plus settings dialog.",
+    function (I) { adblockplus_settings(I.buffer); });
 
 
-interactive("adblockplus-add", "Add a pattern to Adblock Plus.",
-            function (I) {
-    var element = yield read_browser_object(I);
+interactive("adblockplus-add",
+    "Add a pattern to Adblock Plus.",
+    function (I) {
+        var element = yield read_browser_object(I);
+        var spec = load_spec(element);
+        var pattern = yield I.minibuffer.read_url(
+            $prompt = "Adblock:",
+            $initial_value = load_spec_uri_string(spec),
+            $history = "url");
+        adblockplus_service.addPatterns([load_spec_uri_string(pattern)]);
+        I.buffer.web_navigation.reload(Ci.nsIWebNavigation.LOAD_FLAGS_NONE);
+    },
+    $browser_object = browser_object_images,
+    $prompt = "Adblock");
 
-    var spec = load_spec(element);
-
-    var pattern = yield I.minibuffer.read_url(
-        $prompt = "Adblock:",
-        $initial_value = load_spec_uri_string(spec),
-        $history = "url");
-
-    adblockplus_service.addPatterns([pattern]);
-
-    I.buffer.web_navigation.reload(Ci.nsIWebNavigation.LOAD_FLAGS_NONE);
-},
-            $browser_object = browser_object_images,
-            $prompt = "Adblock");
-
+provide("adblockplus");

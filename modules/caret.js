@@ -6,15 +6,17 @@
  * COPYING file.
 **/
 
+in_module(null);
+
 function caret_modality (buffer, elem) {
-    return caret_keymap;
+    buffer.keymaps.push(caret_keymap);
 }
 
 define_buffer_mode('caret_mode',
     $display_name = 'CARET',
     $enable = function (buffer) {
         buffer.browser.setAttribute('showcaret', 'true');
-        var sc = getFocusedSelCtrl(buffer);
+        var sc = buffer.focused_selection_controller;
         sc.setCaretEnabled(true);
         buffer.top_frame.focus();
         buffer.modalities.push(caret_modality);
@@ -22,7 +24,7 @@ define_buffer_mode('caret_mode',
     },
     $disable = function (buffer) {
         buffer.browser.setAttribute('showcaret', 'false');
-        var sc = getFocusedSelCtrl(buffer);
+        var sc = buffer.focused_selection_controller;
         sc.setCaretEnabled(false);
         buffer.browser.focus();
         var i = buffer.modalities.indexOf(caret_modality);
@@ -49,3 +51,5 @@ watch_pref('accessibility.browsewithcaret',
                    remove_hook('create_buffer_hook', caret_mode_enable);
                }
            });
+
+provide("caret");

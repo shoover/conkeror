@@ -5,6 +5,8 @@
  * COPYING file.
 **/
 
+in_module(null);
+
 require("utils.js");
 
 var search_engines = new string_hashmap();
@@ -220,7 +222,8 @@ search_engine.prototype.get_query_load_spec = function search_engine__get_query_
 search_engine.prototype.__defineGetter__("completer", function () {
     const response_type_json = "application/x-suggestions+json";
     const response_type_xml = "application/x-suggestions+xml";
-
+    const json = ("@mozilla.org/dom/json;1" in Cc) &&
+        Cc["@mozilla.org/dom/json;1"].createInstance(Ci.nsIJSON);
     var eng = this;
     if (this.supports_response_type(response_type_xml)) {
         return function (input, pos, conservative) {
@@ -256,7 +259,7 @@ search_engine.prototype.__defineGetter__("completer", function () {
                 yield co_return(null);
             }
         };
-    } else if (JSON && this.supports_response_type(response_type_json)) {
+    } else if (json && this.supports_response_type(response_type_json)) {
         return function (input, pos, conservative) {
             if (pos == 0 && conservative)
                 yield co_return(undefined);
@@ -264,7 +267,7 @@ search_engine.prototype.__defineGetter__("completer", function () {
             try {
                 let lspec = eng.get_query_load_spec(str, response_type_json);
                 let result = yield send_http_request(lspec);
-                let data = JSON.decode(result.responseText);
+                let data = json.decode(result.responseText);
                 delete result;
                 delete lspec;
 
@@ -309,12 +312,12 @@ function search_engine_get_homepage(search_engine) {
 
 // Load search engines from default directories
 {
-    let dir = file_locator.get("CurProcD", Ci.nsIFile);
+    let dir = file_locator_service.get("CurProcD", Ci.nsIFile);
     dir.append("search-engines");
     if (dir.exists() && dir.isDirectory())
         load_search_engines_in_directory(dir);
 
-    dir = file_locator.get("ProfD", Ci.nsIFile);
+    dir = file_locator_service.get("ProfD", Ci.nsIFile);
     dir.append("search-engines");
     if (dir.exists() && dir.isDirectory())
         load_search_engines_in_directory(dir);
@@ -343,7 +346,10 @@ function define_search_engine_webjump(search_engine_name, key) {
 define_search_engine_webjump("google.xml", "google");
 define_search_engine_webjump("mozilla-bugzilla.xml", "bugzilla");
 define_search_engine_webjump("wikipedia.xml", "wikipedia");
+define_search_engine_webjump("wiktionary.xml", "wiktionary");
 define_search_engine_webjump("answers.xml", "answers");
 define_search_engine_webjump("yahoo.xml", "yahoo");
 define_search_engine_webjump("creativecommons.xml", "creativecommons");
 define_search_engine_webjump("eBay.xml", "ebay");
+
+provide("search-engine");

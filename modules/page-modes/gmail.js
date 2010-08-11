@@ -8,25 +8,23 @@
  * COPYING file.
 **/
 
+in_module(null);
+
 require("content-buffer.js");
 
-
-function gmail_bind_common (keymap) {//BAD
-    // Rebind overridden commands
-    define_key(keymap, "C-c g", "find-url");
-    define_key(keymap, "C-c c", "copy");
-    define_key(keymap, "C-c x", "shell-command-on-file");
-    define_key(keymap, "C-c s", "save");
-    define_key(keymap, "C-c r", "reload");
-    define_key(keymap, "C-c f", "follow");
-    define_key(keymap, "C-c t", "follow-top");
-
-    define_key(keymap, "tab", null, $fallthrough);
-}
+define_keymap("gmail_base_keymap");
+define_key(gmail_base_keymap, "C-c g", "find-url");
+define_key(gmail_base_keymap, "C-c c", "copy");
+define_key(gmail_base_keymap, "C-c x", "shell-command-on-file");
+define_key(gmail_base_keymap, "C-c s", "save");
+define_key(gmail_base_keymap, "C-c r", "reload");
+define_key(gmail_base_keymap, "C-c f", "follow");
+define_key(gmail_base_keymap, "C-c t", "follow-top");
+define_key(gmail_base_keymap, "C-c b", "bookmark");
+define_key(gmail_base_keymap, "tab", null, $fallthrough);
 
 
-define_keymap("gmail_keymap");
-gmail_bind_common(gmail_keymap);
+define_keymap("gmail_keymap", $parent = gmail_base_keymap);
 
 // Jumping
 define_key(gmail_keymap, "g", null, $fallthrough);
@@ -34,6 +32,7 @@ define_key(gmail_keymap, "i", null, $fallthrough);
 define_key(gmail_keymap, "t", null, $fallthrough);
 define_key(gmail_keymap, "d", null, $fallthrough);
 define_key(gmail_keymap, "a", null, $fallthrough);
+define_key(gmail_keymap, "b", null, $fallthrough);
 
 // Threadlist
 define_key(gmail_keymap, "*", null, $fallthrough);
@@ -71,9 +70,8 @@ define_key(gmail_keymap, "]", null, $fallthrough);
 define_key(gmail_keymap, "[", null, $fallthrough);
 define_key(gmail_keymap, "l", null, $fallthrough);
 
-define_keymap("gmail_edit_keymap");//BAD
+define_keymap("gmail_edit_keymap", $parent = gmail_base_keymap);//BAD
 define_fallthrough(gmail_edit_keymap, match_text_keys);
-gmail_bind_common(gmail_edit_keymap);
 
 function gmail_modality (buffer, element) {
     if (! buffer.input_mode)
@@ -108,3 +106,5 @@ define_page_mode("gmail_mode",
 var gmail_re = build_url_regex($domain = "mail.google",
                                $path = new RegExp('(?!support)'));
 auto_mode_list.push([gmail_re, gmail_mode]);
+
+provide("gmail");

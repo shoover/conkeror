@@ -6,6 +6,8 @@
  * COPYING file.
 **/
 
+in_module(null);
+
 require("utils.js");
 
 var interactive_commands = new string_hashmap();
@@ -58,6 +60,7 @@ function interactive_context (buffer) {
     }
 }
 interactive_context.prototype = {
+    constructor: interactive_context,
 
     get P () this.prefix_argument,
 
@@ -177,3 +180,4 @@ function set_default_browser_object (name, browser_object) {
     cmd.browser_object = browser_object;
 }
 
+provide("interactive");

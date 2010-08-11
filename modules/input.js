@@ -1,11 +1,13 @@
 /**
  * (C) Copyright 2004-2007 Shawn Betts
- * (C) Copyright 2007-2009 John J. Foerch
+ * (C) Copyright 2007-2010 John J. Foerch
  * (C) Copyright 2007-2008 Jeremy Maitin-Shepard
  *
  * Use, modification, and distribution are subject to the terms specified in the
  * COPYING file.
 **/
+
+in_module(null);
 
 require("window.js");
 require("keymap.js");
@@ -67,16 +69,43 @@ function command_event (command) {
  * As a small measure of efficiency, these objects get recycled from one
  * sequence to the next.
  */
-function input_state (window) {
-    this.window = window;
+function input_state () {
     this.fallthrough = {};
 }
 input_state.prototype = {
+    constructor: input_state,
     continuation: null,
+    fallthrough: null
+};
 
-    // If this is non-null, it is used instead of the current buffer's
-    // keymap.  Used for minibuffer.
-    override_keymap: null //this should be stored in the minibuffer state, right?
+
+/**
+ * input_stack is a stack of input_states, which is to say a stack of
+ * recursed sequences.  input recursion happens, for example, when a
+ * minibuffer read takes place in the middle of another sequence.
+ */
+function input_stack () {
+    this.push(new input_state());
+}
+input_stack.prototype = {
+    constructor: input_stack,
+    __proto__: Array.prototype,
+
+    help_timer: null,
+    help_displayed: false,
+
+    toString: function () {
+        return "[input_stack ("+this.length+")]";
+    },
+    get current () {
+        return this[this.length - 1];
+    },
+    begin_recursion: function () {
+        this.push(new input_state());
+    },
+    end_recursion: function () {
+        this.pop();
+    }
 };
 
 
@@ -109,11 +138,16 @@ define_window_local_hook("keypress_hook", RUN_HOOK_UNTIL_SUCCESS,
     "that is desired.");
 
 
+/**
+ * get_current_keymaps returns the keymap stack for the current focus
+ * context of the given window.  This is the top-level keymap stack, not
+ * the stack that represents any on-going key sequence.
+ */
 function get_current_keymaps (window) {
-    if (window.input.current.override_keymap)
-        return [window.input.current.override_keymap];
-    if (window.buffers.current.override_keymaps.length > 0)
-        return window.buffers.current.override_keymaps;
+    var m = window.minibuffer;
+    var s = m.current_state;
+    if (m.active && s.keymaps)
+        return s.keymaps;
     return window.buffers.current.keymaps;
 }
 
@@ -163,17 +197,23 @@ sequence:
 
                 // make the combo string
                 var combo = format_key_combo(clone);
-                I.key_sequence.push(combo);
+                var canabort = I.key_sequence.push(combo) > 1;
                 I.combo = combo;
                 I.event = clone;
+
+                // make active keymaps visible to commands
+                I.keymaps = keymaps;
 
                 if (keypress_hook.run(window, I, event))
                     break;
 
                 var overlay_keymap = I.overlay_keymap;
 
-                var binding = (overlay_keymap && keymap_lookup([overlay_keymap], combo, event)) ||
-                    keymap_lookup(keymaps, combo, event);
+                var binding =
+                    (canabort && keymap_lookup([sequence_abort_keymap], combo, event)) ||
+                    (overlay_keymap && keymap_lookup([overlay_keymap], combo, event)) ||
+                    keymap_lookup(keymaps, combo, event) ||
+                    keymap_lookup([sequence_help_keymap], combo, event);
 
                 // kill event for any unbound key, or any bound key which
                 // is not marked fallthrough
@@ -282,6 +322,8 @@ function input_handle_keyup (event) {
 function input_handle_command (event) {
     var window = this;
     var state = window.input.current;
+    if (typeof event == 'string')
+        event = new command_event(event);
     if (state.continuation)
         state.continuation(event);
     else
@@ -302,18 +344,7 @@ function input_sequence_abort (message) {
 
 
 function input_initialize_window (window) {
-    window.input = [new input_state(window)]; // a stack of states
-    window.input.__defineGetter__("current", function () {
-        return this[this.length - 1];
-    });
-    window.input.begin_recursion = function () {
-        this.push(new input_state(window));
-    };
-    window.input.end_recursion = function () {
-        this.pop();
-    };
-    window.input.help_timer = null;
-    window.input.help_displayed = false;
+    window.input = new input_stack();
     //window.addEventListener("keydown", input_handle_keydown, true);
     window.addEventListener("keypress", input_handle_keypress, true);
     //window.addEventListener("keyup", input_handle_keyup, true);
@@ -321,3 +352,10 @@ function input_initialize_window (window) {
 }
 
 add_hook("window_initialize_hook", input_initialize_window);
+
+
+interactive("sequence-abort",
+    "Abort an ongoing key sequence.",
+    function (I) { I.minibuffer.message("abort sequence"); });
+
+provide("input");

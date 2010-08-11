@@ -32,6 +32,8 @@
  *   fail and return without telling the user why we are doing so.
  */
 
+in_module(null);
+
 {
     //// Manual sessions. ////
 
@@ -47,51 +49,88 @@
 
     let _json = Cc["@mozilla.org/dom/json;1"].createInstance(Ci.nsIJSON);
 
-    function session_get() {
+    /**
+     * session_get generates and returns a structure containing session
+     * data for the current group of open windows.
+     */
+    function session_get () {
         let windows = {};
         let x = 0;
         for_each_window(function (w) {
             let buffers = {};
             let y = 0;
             w.buffers.for_each(function (b) {
-                if (! b.browser || ! b instanceof content_buffer) return;
-                buffers[y] = b.browser.contentDocument.location.href;
+                if (! b.browser || ! (b instanceof content_buffer))
+                    return;
+                buffers[y] = b.display_uri_string;
                 y++;
             });
-            if (y == 0) return;
+            if (y == 0)
+                return;
             windows[x] = buffers;
             x++;
         });
         return windows;
     }
 
-    function session_load(session, window, buffer_idx) {
+    /**
+     * session_load loads the given session (given as a data structure),
+     * with optional window as the first window to load the session into,
+     * with optional buffer_idx as the buffer index at which to begin
+     * overwriting existing buffers.
+     */
+    function session_load (session, window, buffer_idx) {
         if (! (session[0] && session[0][0]))
             throw new Error("Invalid 'session' argument.");
         let s = 0;
         if (window) {
             let bi = buffer_idx != undefined ?
                 buffer_idx : window.buffers.count;
-            for (let i = 0; session[s][i]; ++i, ++bi) {
+
+            // first kill special buffers slated for recycling.
+            let (b, i = (bi == 0 ? 1 : bi),
+                 safe2kill = bi > 0)
+            {
+                while ((b = window.buffers.get_buffer(i))) {
+                    if (b instanceof content_buffer) {
+                        safe2kill = true;
+                        ++i;
+                    } else
+                        kill_buffer(b, true);
+                }
+                if (bi == 0 &&
+                    (b = window.buffers.get_buffer(0)) &&
+                    !(b instanceof content_buffer))
+                {
+                    if (! safe2kill)
+                        create_buffer(window,
+                                      buffer_creator(content_buffer),
+                                      OPEN_NEW_BUFFER_BACKGROUND);
+                    kill_buffer(b, true);
+                }
+            }
+
+            // it is now safe to recycle the remaining buffers.
+            for (let i = 0; session[s][i] != undefined; ++i, ++bi) {
                 let b = window.buffers.get_buffer(bi);
-                if (! b instanceof content_buffer) continue;
-                if (b) b.load(session[s][i]);
+                if (b)
+                    b.load(session[s][i]);
                 else {
                     let c = buffer_creator(content_buffer, $load = session[s][i]);
                     create_buffer(window, c, OPEN_NEW_BUFFER_BACKGROUND);
                 }
             }
             for (let b = window.buffers.get_buffer(bi); b;
-                 b = window.buffers.get_buffer(bi)) {
-                if (b instanceof content_buffer) kill_buffer(b, true);
-                else bi++;
+                 b = window.buffers.get_buffer(bi))
+            {
+                kill_buffer(b, true);
             }
             ++s;
         }
 
-        function make_init_hook(session) {
-            function init_hook(window) {
-                for (let i = 1; session[i]; ++i) {
+        function make_init_hook (session) {
+            function init_hook (window) {
+                for (let i = 1; session[i] != undefined; ++i) {
                     let c = buffer_creator(content_buffer, $load = session[i]);
                     create_buffer(window, c, OPEN_NEW_BUFFER_BACKGROUND);
                 }
@@ -99,7 +138,7 @@
             return init_hook;
         }
 
-        for (; session[s]; ++s) {
+        for (; session[s] != undefined; ++s) {
             let w = make_window(buffer_creator(content_buffer,
                                                $load = session[s][0]));
             add_hook.call(w, "window_initialize_late_hook",
@@ -107,34 +146,58 @@
         }
     }
 
-    function session_load_window_new(session) {
+    /**
+     * session_load_window_new loads the given session into new windows.
+     */
+    function session_load_window_new (session) {
         session_load(session);
     }
 
-    function session_load_window_current(session, window) {
+    /**
+     * session_load_window_current loads the given session, with the
+     * session's first window being appended to window.  No existing
+     * buffers will be overwritten.
+     */
+    function session_load_window_current (session, window) {
         let w = window ? window : get_recent_conkeror_window();
         session_load(session, w);
     }
 
-    function session_load_window_current_replace(session, window) {
+    /**
+     * session_load_window_current loads the given session, with the
+     * session's first window replacing the given window.  All buffers in
+     * the given window will be overwritten.
+     */
+    function session_load_window_current_replace (session, window) {
         let w = window ? window : get_recent_conkeror_window();
         session_load(session, w, 0);
     }
 
-    function session_write(path, session) {
+    /**
+     * session_write writes the given session to the file given by path.
+     */
+    function session_write (path, session) {
         if (! (path instanceof Ci.nsIFile))
             path = make_file(path);
-        if (! session) session = session_get();
+        if (! session)
+            session = session_get();
         write_text_file(path, _json.encode(session));
     }
 
-    function session_read(path) {
+    /**
+     * session_read reads session data from the given file path,
+     * and returns a decoded session structure.
+     */
+    function session_read (path) {
         if (! (path instanceof Ci.nsIFile))
             path = make_file(path);
         return _json.decode(read_text_file(path));
     }
 
-    function session_remove(path) {
+    /**
+     * session_remove deletes the given session file.
+     */
+    function session_remove (path) {
         if (! (path instanceof Ci.nsIFile))
             path = make_file(path);
         path.remove(false);
@@ -157,38 +220,54 @@
         dumpln(msg);
     }
 
-    interactive("session-save", "Save the current session.", function (I) {
-        session_write(make_file(yield _session_prompt_file(I)), session_get());
-    });
+    interactive("session-save",
+        "Save the current session.",
+        function (I) {
+            session_write(make_file(yield _session_prompt_file(I)),
+                          session_get());
+        });
 
-    interactive("session-load-window-new", "Load a session in a new window.", 
+    interactive("session-load-window-new",
+        "Load a session in a new window.", 
         function (I) {
             let file = make_file(yield _session_prompt_file(I));
-            if (! file.exists()) _session_file_not_found(I, file);
-            else session_load_window_new(session_read(file));
+            if (! file.exists())
+                _session_file_not_found(I, file);
+            else
+                session_load_window_new(session_read(file));
         });
 
     interactive("session-load-window-current",
         "Load a session in new buffers in the current window.",
         function (I) {
             let file = make_file(yield _session_prompt_file(I));
-            if (! file.exists()) _session_file_not_found(I, file);
-            else session_load_window_current(session_read(file), I.window);
+            if (! file.exists())
+                _session_file_not_found(I, file);
+            else
+                session_load_window_current(session_read(file), I.window);
         });
 
     interactive("session-load-window-current-replace", 
-        "Replace all buffers in the current window with buffers in the saved session.",
+        "Replace all buffers in the current window with buffers "+
+        "in the saved session.",
         function (I) {
             let file = make_file(yield _session_prompt_file(I));
-            if (! file.exists()) _session_file_not_found(I, file);
-            else session_load_window_current_replace(session_read(file), I.window, 0)
+            if (! file.exists())
+                _session_file_not_found(I, file);
+            else
+                session_load_window_current_replace(session_read(file),
+                                                    I.window, 0);
         });
 
-    interactive("session-remove", "Remove a session file.", function (I) {
-        let file = make_file(yield _session_prompt_file(I));
-        if (! file.exists()) _session_file_not_found(I, file);
-        else session_remove(file);
-    });
+    interactive("session-remove",
+        "Remove a session file.",
+        function (I) {
+            let file = make_file(yield _session_prompt_file(I));
+            if (! file.exists())
+                _session_file_not_found(I, file);
+            else
+                session_remove(file);
+        });
 
 
     //// Auto-save sessions. ////
@@ -198,18 +277,18 @@
         "Default filename for the auto-save session.");
 
     define_variable("session_auto_save_auto_load", false,
-        'Whether to load the auto-saved session when the browser is started. ' +
+        'Whether to load the auto-saved session when the browser is started. '+
         'May be true, false, or "prompt".');
 
-    function session_auto_save_load_window_new() {
+    function session_auto_save_load_window_new () {
         session_load_window_new(_session_auto_save_cached);
     }
 
-    function session_auto_save_load_window_current(window) {
+    function session_auto_save_load_window_current (window) {
         session_load_window_current(_session_auto_save_cached, window);
     }
 
-    function session_auto_save_load_window_current_replace(window) {
+    function session_auto_save_load_window_current_replace (window) {
         session_load_window_current_replace(_session_auto_save_cached, window);
     }
     
@@ -235,42 +314,47 @@
         return f;
     };
 
-    function session_auto_save_save() {
+    function session_auto_save_save () {
         let f = _session_auto_save_file_get();
         let s = session_get();
-        if (s[0]) session_write(f, s);
-        else if (f.exists()) f.remove(false);
+        if (s[0])
+            session_write(f, s);
+        else if (f.exists())
+            f.remove(false);
     }
 
-    function session_auto_save_remove() {
+    function session_auto_save_remove () {
         let f = _session_auto_save_file_get();
-        if (f.exists()) f.remove(false);
+        if (f.exists())
+            f.remove(false);
     }
 
     let _session_auto_save_auto_load = function (user_gave_urls) {
-        if (! session_auto_save_auto_load) return;
+        if (! session_auto_save_auto_load)
+            return;
         if (! _session_auto_save_cached) {
             _session_file_not_found(null, _session_auto_save_file_get());
             return;
         }
         let do_load = false;
         let window = get_recent_conkeror_window();
-        if (session_auto_save_auto_load == true) do_load = true;
+        if (session_auto_save_auto_load == true)
+            do_load = true;
         else if (session_auto_save_auto_load == "prompt" && !user_gave_urls) {
             do_load = (yield window.minibuffer.read_single_character_option(
                 $prompt = "Load auto-saved session? (y/n)",
                 $options = ["y", "n"]
             )) == "y";
-        }
-        else
+        } else
             throw new Error("Invalid value for session_auto_save_auto_load: " +
                             session_auto_save_auto_load);
-        if (! do_load) return;
+        if (! do_load)
+            return;
         if (user_gave_urls) {
             if (session_auto_save_auto_load_fn)
                 session_auto_save_auto_load_fn(window);
-        }
-        else session_auto_save_load_window_current_replace(window);
+        } else
+            session_auto_save_load_window_current_replace(window);
     };
 
     interactive("session-auto-save-load-window-new",
@@ -278,26 +362,31 @@
         function (I) { 
             if (_session_auto_save_cached == null)
                 _session_file_not_found(I, _session_auto_save_file_get());
-            else session_auto_save_load_window_new();
+            else
+                session_auto_save_load_window_new();
         });
 
     interactive("session-auto-save-load-window-current",
         "Load the auto-save session in new buffers in the current window.",
         function (I) {
             if (_session_auto_save_cached == null)
-                _session_file_not_found(I, session_auto_save_file_get());
-            else session_auto_save_load_window_current(I.window);
+                _session_file_not_found(I, _session_auto_save_file_get());
+            else
+                session_auto_save_load_window_current(I.window);
         });
 
     interactive("session-auto-save-load-window-current-replace",
-        "Replace all buffers in the current window with buffers in the auto-saved session.",
+        "Replace all buffers in the current window with buffers in the "+
+        "auto-saved session.",
         function (I) {
             if (_session_auto_save_cached == null)
-                _session_file_not_found(I, session_auto_save_file_get());
-            else session_auto_save_load_window_current_replace(I.window);
+                _session_file_not_found(I, _session_auto_save_file_get());
+            else
+                session_auto_save_load_window_current_replace(I.window);
         });
 
-    interactive("session-auto-save-remove", "Remove the auto-save session",
+    interactive("session-auto-save-remove",
+                "Remove the auto-save session",
                 session_auto_save_remove);
 
 
@@ -328,8 +417,7 @@
             add_hook("create_buffer_hook", session_auto_save_save);
             add_hook("kill_buffer_hook", session_auto_save_save);
             add_hook("content_buffer_location_change_hook", session_auto_save_save);
-        }
-        else
+        } else
             add_hook("window_initialize_late_hook", _session_auto_save_mode_bootstrap);
     };
 
@@ -347,3 +435,5 @@
 
     session_auto_save_mode(true);
 }
+
+provide("session");

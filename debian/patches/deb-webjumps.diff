@@ -1,19 +1,21 @@
 Adds and enables some Debian and Ubuntu related webjumps which should
 not be inlcuded in upstream by default.
 
-Index: conkeror-0.9.1/modules/debian/webjumps.js
+Index: conkeror-0.9.2+git100324/modules/debian/debian-webjumps.js
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ conkeror-0.9.1/modules/debian/webjumps.js	2010-01-13 01:31:38.000000000 +0100
-@@ -0,0 +1,23 @@
++++ conkeror-0.9.2+git100324/modules/debian/debian-webjumps.js	2010-03-24 23:39:39.000000000 +0100
+@@ -0,0 +1,30 @@
 +/**
-+ * (C) Copyright 2008-2009 Axel Beckert
++ * (C) Copyright 2008-2010 Axel Beckert
 + *
 + * Use, modification, and distribution are subject to the terms specified in the
 + * COPYING file.
 + *
 + * Webjumps to interact with Debian and Ubuntu websites
 +**/
++
++in_module(null);
 +
 +require("webjump.js");
 +
@@ -23,20 +25,25 @@ Index: conkeror-0.9.1/modules/debian/webjumps.js
 +define_webjump("debbugs", "http://bugs.debian.org/%s");
 +define_webjump("debpts", "http://packages.qa.debian.org/%s");
 +define_webjump("debpopcon", "http://qa.debian.org/popcon.php?package=%s");
++define_webjump("buildd", "https://buildd.debian.org/%s");
++define_webjump("buildd-ports", "http://buildd.debian-ports.org/build.php?pkg=%s");
++define_webjump("debqa", "http://qa.debian.org/developer.php?login=%s");
 +
 +// Ubuntu //
 +define_webjump("ubuntupkg", "http://packages.ubuntu.com/%s");
 +define_webjump("ubuntufile", "http://packages.ubuntu.com/search?searchon=contents&keywords=%s&mode=path&arch=any");
 +define_webjump("ubuntubugs", "http://launchpad.net/ubuntu/+source/%s");
 +define_webjump("launchpad", "https://launchpad.net/+search?field.text=%s");
-Index: conkeror-0.9.1/defaults/preferences/default-modules.js
++
++provide("debian-webjumps");
+Index: conkeror-0.9.2+git100324/defaults/preferences/default-modules.js
 ===================================================================
---- conkeror-0.9.1.orig/defaults/preferences/default-modules.js	2009-09-24 02:17:21.000000000 +0200
-+++ conkeror-0.9.1/defaults/preferences/default-modules.js	2009-09-24 02:17:48.000000000 +0200
+--- conkeror-0.9.2+git100324.orig/defaults/preferences/default-modules.js	2010-03-24 01:31:44.000000000 +0100
++++ conkeror-0.9.2+git100324/defaults/preferences/default-modules.js	2010-03-24 01:36:18.000000000 +0100
 @@ -60,3 +60,6 @@
  pref("conkeror.load.page-modes/dailymotion", 1);
- pref("conkeror.load.page-modes/gmail", 0);
  pref("conkeror.load.page-modes/xkcd", 1);
+ pref("conkeror.load.page-modes/stackoverflow", 1);
 +
 +// Debian modules
-+pref("conkeror.load.debian/webjumps", 1);
++pref("conkeror.load.debian/debian-webjumps", 1);

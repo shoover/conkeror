@@ -7,6 +7,8 @@
  * COPYING file.
 **/
 
+in_module(null);
+
 var webjumps = {};
 
 define_keywords("$completer", "$description", "$argument", "$alternative");
@@ -111,7 +113,6 @@ function define_default_webjumps () {
     define_webjump("clhs",
                    "http://www.xach.com/clhs?q=%s",
                    $alternative = "http://www.lispworks.com/documentation/HyperSpec/Front/index.htm");
-    define_webjump("emacswiki",  "http://www.emacswiki.org/cgi-bin/wiki?search=%s");
     define_webjump("cliki",      "http://www.cliki.net/admin/search?words=%s");
     define_webjump("ratpoisonwiki", "http://ratpoison.antidesktop.net/?search=%s");
     define_webjump("stumpwmwiki", "http://stumpwm.antidesktop.net/wiki?search=%s");
@@ -210,3 +211,5 @@ function webjump_completer () {
         yield co_return(base_completer(input, pos, conservative));
     };
 }
+
+provide("webjump");

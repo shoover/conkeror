@@ -6,6 +6,8 @@
  * COPYING file.
 **/
 
+in_module(null);
+
 var MAX_DUMP_DEPTH = 1;
 function dump_obj_r (obj, name, indent, depth) {
     if (depth > MAX_DUMP_DEPTH) {
@@ -80,3 +82,24 @@ function get_interface_info (o) {
  * the local context.
  */
 const DEBUG_HERE = "function (__DEBUG_HERE) { return eval(__DEBUG_HERE); }";
+
+
+
+let (console = Cc["@mozilla.org/consoleservice;1"]
+                   .getService(Ci.nsIConsoleService)) {
+    console.registerListener({
+        observe: function (msg) {
+            if (msg instanceof Ci.nsIScriptError) {
+                switch (msg.category) {
+                case "CSS Parser":
+                case "content javascript":
+                    return;
+                }
+                msg.QueryInterface(Ci.nsIScriptError);
+                dumpln("Console error: " + msg.message);
+                dumpln("  Category: " + msg.category);
+            }
+        }});
+}
+
+provide("debug");

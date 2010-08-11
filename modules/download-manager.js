@@ -6,17 +6,14 @@
  * COPYING file.
 **/
 
+in_module(null);
+
 require("special-buffer.js");
 require("mime-type-override.js");
 require("minibuffer-read-mime-type.js");
 
 var download_manager_service = Cc["@mozilla.org/download-manager;1"]
     .getService(Ci.nsIDownloadManager);
-
-var download_manager_builtin_ui = Components
-    .classesByID["{7dfdf0d1-aff6-4a34-bad1-d0fe74601642}"]
-    .getService(Ci.nsIDownloadManagerUI);
-
 
 var unmanaged_download_info_list = [];
 var id_to_download_info = {};
@@ -44,9 +41,10 @@ function download_info (source_buffer, mozilla_info, target_file) {
         this.attach(mozilla_info);
 }
 download_info.prototype = {
-    attach : function (mozilla_info) {
+    constructor: download_info,
+    attach: function (mozilla_info) {
         if (!this.target_file)
-            this.__defineGetter__("target_file", function(){
+            this.__defineGetter__("target_file", function () {
                     return this.mozilla_info.targetFile;
                 });
         else if (this.target_file.path != mozilla_info.targetFile.path)
@@ -56,17 +54,17 @@ download_info.prototype = {
         download_added_hook.run(this);
     },
 
-    target_file : null,
+    target_file: null,
 
-    shell_command : null,
+    shell_command: null,
 
-    shell_command_cwd : null,
+    shell_command_cwd: null,
 
-    temporary_status : DOWNLOAD_NOT_TEMPORARY,
+    temporary_status: DOWNLOAD_NOT_TEMPORARY,
 
-    action_description : null,
+    action_description: null,
 
-    set_shell_command : function (str, cwd) {
+    set_shell_command: function (str, cwd) {
         this.shell_command = str;
         this.shell_command_cwd = cwd;
         if (this.mozilla_info)
@@ -104,7 +102,7 @@ download_info.prototype = {
     get id () { return this.mozilla_info.id; },
     get referrer () { return this.mozilla_info.referrer; },
 
-    target_file_text : function () {
+    target_file_text: function () {
         let target = this.target_file.path;
         let display = this.display_name;
         if (target.indexOf(display, target.length - display.length) == -1)
@@ -112,12 +110,12 @@ download_info.prototype = {
         return target;
     },
 
-    throw_if_removed : function () {
+    throw_if_removed: function () {
         if (this.removed)
             throw interactive_error("Download has already been removed from the download manager.");
     },
 
-    throw_state_error : function () {
+    throw_state_error: function () {
         switch (this.state) {
         case DOWNLOAD_DOWNLOADING:
             throw interactive_error("Download is already in progress.");
@@ -137,7 +135,7 @@ download_info.prototype = {
     },
 
     // Download manager operations
-    cancel : function ()  {
+    cancel: function ()  {
         this.throw_if_removed();
         switch (this.state) {
         case DOWNLOAD_DOWNLOADING:
@@ -154,7 +152,7 @@ download_info.prototype = {
         }
     },
 
-    retry : function () {
+    retry: function () {
         this.throw_if_removed();
         switch (this.state) {
         case DOWNLOAD_CANCELED:
@@ -170,7 +168,7 @@ download_info.prototype = {
         }
     },
 
-    resume : function () {
+    resume: function () {
         this.throw_if_removed();
         switch (this.state) {
         case DOWNLOAD_PAUSED:
@@ -185,7 +183,7 @@ download_info.prototype = {
         }
     },
 
-    pause : function () {
+    pause: function () {
         this.throw_if_removed();
         switch (this.state) {
         case DOWNLOAD_DOWNLOADING:
@@ -201,7 +199,7 @@ download_info.prototype = {
         }
     },
 
-    remove : function () {
+    remove: function () {
         this.throw_if_removed();
         switch (this.state) {
         case DOWNLOAD_FAILED:
@@ -218,7 +216,7 @@ download_info.prototype = {
         }
     },
 
-    delete_target : function () {
+    delete_target: function () {
         if (this.state != DOWNLOAD_FINISHED)
             throw interactive_error("Download has not finished.");
         try {
@@ -285,7 +283,7 @@ var download_info_max_queue_delay = 100;
 var download_progress_listener = {
     QueryInterface: generate_QI(Ci.nsIDownloadProgressListener),
 
-    onDownloadStateChange : function (state, download) {
+    onDownloadStateChange: function (state, download) {
         var info = null;
         /* FIXME: Determine if only new downloads will have this state
          * as their previous state. */
@@ -336,9 +334,9 @@ var download_progress_listener = {
         }
     },
 
-    onProgressChange : function (progress, request, cur_self_progress, max_self_progress,
-                                 cur_total_progress, max_total_progress,
-                                 download) {
+    onProgressChange: function (progress, request, cur_self_progress, max_self_progress,
+                                cur_total_progress, max_total_progress,
+                                download) {
         var info = id_to_download_info[download.id];
         if (info == null) {
             dumpln("error: encountered unknown download in progress change");
@@ -350,15 +348,15 @@ var download_progress_listener = {
         // + cur_total_progress + "/" + max_total_progress + ", " + download.state + ", " + download.id);
     },
 
-    onSecurityChange : function (progress, request, state, download) {
+    onSecurityChange: function (progress, request, state, download) {
     },
 
-    onStateChange : function (progress, request, state_flags, status, download) {
+    onStateChange: function (progress, request, state_flags, status, download) {
     }
 };
 
 var download_observer = {
-    observe : function (subject, topic, data) {
+    observe: function (subject, topic, data) {
         switch(topic) {
         case "download-manager-remove-download":
             var ids = [];
@@ -389,66 +387,6 @@ observer_service.addObserver(download_observer, "download-manager-remove-downloa
 
 download_manager_service.addListener(download_progress_listener);
 
-function pretty_print_file_size (val) {
-    const GIBI = 1073741824; /* 2^30 */
-    const MEBI = 1048576; /* 2^20 */
-    const KIBI = 1024; /* 2^10 */
-    var suffix, div;
-    if (val < KIBI) {
-        div = 1;
-        suffix = "B";
-    }
-    else if (val < MEBI) {
-        suffix = "KiB";
-        div = KIBI;
-    } else if (val < GIBI) {
-        suffix = "MiB";
-        div = MEBI;
-    } else {
-        suffix = "GiB";
-        div = GIBI;
-    }
-    val = val / div;
-    var precision = 2;
-    if (val > 10)
-        precision = 1;
-    if (val > 100)
-        precision = 0;
-    return [val.toFixed(precision), suffix];
-}
-
-function pretty_print_time (val) {
-    val = Math.round(val);
-    var seconds = val % 60;
-
-    val = Math.floor(val / 60);
-
-    var minutes = val % 60;
-
-    var hours = Math.floor(val / 60);
-
-    var parts = [];
-
-    if (hours > 1)
-        parts.push(hours + " hours");
-    else if (hours == 1)
-        parts.push("1 hour");
-
-    if (minutes > 1)
-        parts.push(minutes + " minutes");
-    else if (minutes == 1)
-        parts.push("1 minute");
-
-    if (minutes <= 1 && hours == 0) {
-        if (seconds != 1)
-            parts.push(seconds + " seconds");
-        else
-            parts.push("1 second");
-    }
-
-    return parts.join(", ");
-}
-
 define_variable("download_buffer_min_update_interval", 2000,
     "Minimum interval (in milliseconds) between updates in download progress buffers.\n" +
     "Lowering this interval will increase the promptness of the progress display at " +
@@ -459,10 +397,10 @@ function download_buffer_modality (buffer, element) {
 }
 
 define_keywords("$info");
-function download_buffer (window, element) {
+function download_buffer (window) {
     this.constructor_begin();
     keywords(arguments);
-    special_buffer.call(this, window, element, forward_keywords(arguments));
+    special_buffer.call(this, window, forward_keywords(arguments));
     this.info = arguments.$info;
     this.local.cwd = this.info.mozilla_info.targetFile.parent;
     this.description = this.info.mozilla_info.source.spec;
@@ -477,10 +415,10 @@ function download_buffer (window, element) {
     this.constructor_end();
 }
 download_buffer.prototype = {
+    constructor: download_buffer,
     __proto__: special_buffer.prototype,
 
-    handle_kill : function () {
-        special_buffer.prototype.handle_kill.call(this);
+    destroy: function () {
         remove_hook.call(this.info, "download_progress_change_hook", this.progress_change_handler_fn);
         remove_hook.call(this.info, "download_state_change_hook", this.progress_change_handler_fn);
         remove_hook.call(this.info, "download_shell_command_change_hook", this.command_change_handler_fn);
@@ -497,9 +435,11 @@ download_buffer.prototype = {
         delete this.command_div_node;
         delete this.command_label_textnode;
         delete this.command_textnode;
+
+        special_buffer.prototype.destroy.call(this);
     },
 
-    update_title : function () {
+    update_title: function () {
         // FIXME: do this properly
         var new_title;
         var info = this.info;
@@ -560,7 +500,7 @@ download_buffer.prototype = {
         return false;
     },
 
-    handle_progress_change : function () {
+    handle_progress_change: function () {
         var cur_time = Date.now();
         if (this.last_update == null ||
             (cur_time - this.last_update) > download_buffer_min_update_interval ||
@@ -577,13 +517,13 @@ download_buffer.prototype = {
         }
     },
 
-    generate : function () {
+    generate: function () {
         var d = this.document;
         var g = new dom_generator(d, XHTML_NS);
 
         /* Warning: If any additional node references are saved in
          * this function, appropriate code to delete the saved
-         * properties must be added to handle_kill. */
+         * properties must be added to destroy method. */
 
         var info = this.info;
 
@@ -641,7 +581,7 @@ download_buffer.prototype = {
             g.text("Action:", cell);
             cell = g.element("div", row, "class", "download-value");
             g.text(info.action_description, cell);
-       }
+        }
 
         this.command_div_node = row = g.element("tr", table, "class", "download-info", "id", "download-command");
         cell = g.element("td", row, "class", "download-label");
@@ -649,17 +589,16 @@ download_buffer.prototype = {
         cell = g.element("td", row, "class", "download-value");
         this.command_textnode = g.text("", cell);
 
-
         this.update_fields();
         this.update_command_field();
     },
 
-    update_fields : function () {
+    update_fields: function () {
         if (!this.generated)
             return;
         var info = this.info;
         var label = null;
-        switch(info.state) {
+        switch (info.state) {
         case DOWNLOAD_DOWNLOADING:
             label = "Downloading";
             break;
@@ -711,25 +650,24 @@ download_buffer.prototype = {
         this.update_command_field();
     },
 
-    update_time_field : function () {
+    update_time_field: function () {
         var info = this.info;
         var elapsed_text = pretty_print_time((Date.now() - info.start_time / 1000) / 1000) + " elapsed";
         var text = "";
-        if (info.state == DOWNLOAD_DOWNLOADING) {
+        if (info.state == DOWNLOAD_DOWNLOADING)
             text = pretty_print_file_size(info.speed).join(" ") + "/s, ";
-        }
         if (info.state == DOWNLOAD_DOWNLOADING &&
             info.size >= 0 &&
-            info.speed > 0) {
+            info.speed > 0)
+        {
             let remaining = (info.size - info.amount_transferred) / info.speed;
             text += pretty_print_time(remaining) + " left (" + elapsed_text + ")";
-        } else {
+        } else
             text = elapsed_text;
-        }
         this.time_textnode.nodeValue = text;
     },
 
-    update_command_field : function () {
+    update_command_field: function () {
         if (!this.generated)
             return;
         if (this.info.shell_command != null) {
@@ -743,9 +681,8 @@ download_buffer.prototype = {
                 label = "Run command:";
             this.command_label_textnode.nodeValue = label;
             this.command_textnode.nodeValue = this.info.shell_command;
-        } else {
+        } else
             this.command_div_node.style.display = "none";
-        }
     }
 };
 
@@ -756,16 +693,16 @@ function download_cancel (buffer) {
     buffer.window.minibuffer.message("Download canceled");
 }
 interactive("download-cancel",
-            "Cancel the current download.\n" +
-            "The download can later be retried using the `download-retry' command, but any " +
-            "data already transferred will be lost.",
-            function (I) {
-                let result = yield I.window.minibuffer.read_single_character_option(
-                    $prompt = "Cancel this download? (y/n)",
-                    $options = ["y", "n"]);
-                if (result == "y")
-                    download_cancel(I.buffer);
-            });
+    "Cancel the current download.\n" +
+    "The download can later be retried using the `download-retry' "+
+    "command, but any data already transferred will be lost.",
+    function (I) {
+        let result = yield I.window.minibuffer.read_single_character_option(
+            $prompt = "Cancel this download? (y/n)",
+            $options = ["y", "n"]);
+        if (result == "y")
+            download_cancel(I.buffer);
+    });
 
 function download_retry (buffer) {
     check_buffer(buffer, download_buffer);
@@ -774,10 +711,11 @@ function download_retry (buffer) {
     buffer.window.minibuffer.message("Download retried");
 }
 interactive("download-retry",
-            "Retry a failed or canceled download.\n" +
-            "This command can be used to retry a download that failed or was canceled using " +
-            "the `download-cancel' command.  The download will begin from the start again.",
-            function (I) {download_retry(I.buffer);});
+    "Retry a failed or canceled download.\n" +
+    "This command can be used to retry a download that failed or "+
+    "was canceled using the `download-cancel' command.  The download "+
+    "will begin from the start again.",
+    function (I) { download_retry(I.buffer); });
 
 function download_pause (buffer) {
     check_buffer(buffer, download_buffer);
@@ -785,10 +723,10 @@ function download_pause (buffer) {
     buffer.window.minibuffer.message("Download paused");
 }
 interactive("download-pause",
-            "Pause the current download.\n" +
-            "The download can later be resumed using the `download-resume' command.  The " +
-            "data already transferred will not be lost.",
-            function (I) {download_pause(I.buffer);});
+    "Pause the current download.\n" +
+    "The download can later be resumed using the `download-resume' command. "+
+    "The data already transferred will not be lost.",
+    function (I) { download_pause(I.buffer); });
 
 function download_resume (buffer) {
     check_buffer(buffer, download_buffer);
@@ -796,9 +734,10 @@ function download_resume (buffer) {
     buffer.window.minibuffer.message("Download resumed");
 }
 interactive("download-resume",
-            "Resume the current download.\n" +
-            "This command can be used to resume a download paused using the `download-pause' command.",
-            function (I) { download_resume(I.buffer); });
+    "Resume the current download.\n" +
+    "This command can be used to resume a download paused using the "+
+    "`download-pause' command.",
+    function (I) { download_resume(I.buffer); });
 
 function download_remove (buffer) {
     check_buffer(buffer, download_buffer);
@@ -806,10 +745,10 @@ function download_remove (buffer) {
     buffer.window.minibuffer.message("Download removed");
 }
 interactive("download-remove",
-            "Remove the current download from the download manager.\n" +
-            "This command can only be used on inactive (paused, canceled, "+
-            "completed, or failed) downloads.",
-            function (I) {download_remove(I.buffer);});
+    "Remove the current download from the download manager.\n" +
+    "This command can only be used on inactive (paused, canceled, "+
+    "completed, or failed) downloads.",
+    function (I) { download_remove(I.buffer); });
 
 function download_retry_or_resume (buffer) {
     check_buffer(buffer, download_buffer);
@@ -820,10 +759,11 @@ function download_retry_or_resume (buffer) {
         download_retry(buffer);
 }
 interactive("download-retry-or-resume",
-            "Retry or resume the current download.\n" +
-            "This command can be used to resume a download paused using the `download-pause' " +
-            "command or canceled using the `download-cancel' command.",
-            function (I) {download_retry_or_resume(I.buffer);});
+    "Retry or resume the current download.\n" +
+    "This command can be used to resume a download paused using the " +
+    "`download-pause' command or canceled using the `download-cancel' "+
+    "command.",
+    function (I) { download_retry_or_resume(I.buffer); });
 
 function download_pause_or_resume (buffer) {
     check_buffer(buffer, download_buffer);
@@ -834,9 +774,9 @@ function download_pause_or_resume (buffer) {
         download_pause(buffer);
 }
 interactive("download-pause-or-resume",
-            "Pause or resume the current download.\n" +
-            "This command toggles the paused state of the current download.",
-            function (I) {download_pause_or_resume(I.buffer);});
+    "Pause or resume the current download.\n" +
+    "This command toggles the paused state of the current download.",
+    function (I) { download_pause_or_resume(I.buffer); });
 
 function download_delete_target (buffer) {
     check_buffer(buffer, download_buffer);
@@ -845,9 +785,9 @@ function download_delete_target (buffer) {
     buffer.window.minibuffer.message("Deleted file: " + info.target_file.path);
 }
 interactive("download-delete-target",
-            "Delete the target file of the current download.\n"  +
-            "This command can only be used if the download has finished successfully.",
-            function (I) {download_delete_target(I.buffer);});
+    "Delete the target file of the current download.\n" +
+    "This command can only be used if the download has finished successfully.",
+    function (I) { download_delete_target(I.buffer); });
 
 function download_shell_command (buffer, cwd, cmd) {
     check_buffer(buffer, download_buffer);
@@ -865,36 +805,42 @@ function download_shell_command (buffer, cwd, cmd) {
     buffer.window.minibuffer.message("Queued shell command: " + cmd);
 }
 interactive("download-shell-command",
-            "Run a shell command on the target file of the current download.\n" +
-            "If the download is still in progress, the shell command will be queued " +
-            "to run when the download finishes.",
-            function (I) {
-                var buffer = check_buffer(I.buffer, download_buffer);
-                var cwd = buffer.info.shell_command_cwd || I.local.cwd;
-                var cmd = yield I.minibuffer.read_shell_command(
-                    $cwd = cwd,
-                    $initial_value = buffer.info.shell_command ||
-                        external_content_handlers.get(buffer.info.MIME_type));
-                download_shell_command(buffer, cwd, cmd);
-            });
+    "Run a shell command on the target file of the current download.\n"+
+    "If the download is still in progress, the shell command will be queued "+
+    "to run when the download finishes.",
+    function (I) {
+        var buffer = check_buffer(I.buffer, download_buffer);
+        var cwd = buffer.info.shell_command_cwd || I.local.cwd;
+        var cmd = yield I.minibuffer.read_shell_command(
+            $cwd = cwd,
+            $initial_value = buffer.info.shell_command ||
+                external_content_handlers.get(buffer.info.MIME_type));
+        download_shell_command(buffer, cwd, cmd);
+    });
 
 function download_manager_ui () {}
 download_manager_ui.prototype = {
-    QueryInterface : XPCOMUtils.generateQI([Ci.nsIDownloadManagerUI]),
+    constructor: download_manager_ui,
+    QueryInterface: XPCOMUtils.generateQI([Ci.nsIDownloadManagerUI]),
 
-    getAttention : function () {},
-    show : function () {},
-    visible : false
+    getAttention: function () {},
+    show: function () {},
+    visible: false
 };
 
 
-function download_manager_show_builtin_ui (window) {
-    download_manager_builtin_ui.show(window);
-}
 interactive("download-manager-show-builtin-ui",
-            "Show the built-in (Firefox-style) download manager user interface.",
-            function (I) {download_manager_show_builtin_ui(I.window);});
+    "Show the built-in (Firefox-style) download manager window.",
+    function (I) {
+        Components.classesByID["{7dfdf0d1-aff6-4a34-bad1-d0fe74601642}"]
+            .getService(Ci.nsIDownloadManagerUI)
+            .show(I.window);
+    });
 
+
+/*
+ * Download-show
+ */ 
 
 define_variable("download_temporary_file_open_buffer_delay", 500,
     "Delay (in milliseconds) before a download buffer is opened for "+
@@ -903,51 +849,11 @@ define_variable("download_temporary_file_open_buffer_delay", 500,
     "effect only if `open_download_buffer_automatically' is in "+
     "`download_added_hook', which is the case by default.");
 
-
-define_variable("download_buffer_automatic_open_target",
-                [OPEN_NEW_WINDOW, OPEN_NEW_BUFFER_BACKGROUND],
+define_variable("download_buffer_automatic_open_target", OPEN_NEW_WINDOW,
     "Target(s) for download buffers created by "+
-    "`open_download_buffer_automatically' and `download-show'.\n"+
-    "It can be a single target or an array of two targets.  When it is an "+
-    "array, the `download-show' command will use the second target when "+
-    "called with universal-argument.");
-
-
-function open_download_buffer_automatically (info, target) {
-    var buf = info.source_buffer;
-    if (target == null) {
-        if (typeof(download_buffer_automatic_open_target) == "object")
-            target = download_buffer_automatic_open_target[0];
-        else
-            target = download_buffer_automatic_open_target;
-    }
-    if (buf == null)
-        target = OPEN_NEW_WINDOW;
-    if (info.temporary_status == DOWNLOAD_NOT_TEMPORARY ||
-        download_temporary_file_open_buffer_delay == 0)
-    {
-        create_buffer(buf.window, buffer_creator(download_buffer, $info = info), target);
-    } else {
-        var timer = null;
-        function finish () {
-            timer.cancel();
-        }
-        add_hook.call(info, "download_finished_hook", finish);
-        timer = call_after_timeout(function () {
-                remove_hook.call(info, "download_finished_hook", finish);
-                create_buffer(buf.window, buffer_creator(download_buffer, $info = info), target);
-            }, download_temporary_file_open_buffer_delay);
-    }
-}
-add_hook("download_added_hook", open_download_buffer_automatically);
-
-
-/*
- * Download-show
- */ 
+    "`open_download_buffer_automatically'.");
 
 minibuffer_auto_complete_preferences.download = true;
-
 minibuffer.prototype.read_download = function () {
     keywords(arguments,
              $prompt = "Download",
@@ -969,16 +875,52 @@ minibuffer.prototype.read_download = function () {
     yield co_return(result);
 };
 
+function download_show (window, target, info) {
+    if (! window)
+        target = OPEN_NEW_WINDOW;
+    create_buffer(window, buffer_creator(download_buffer, $info = info), target);
+}
+
+function download_show_new_window (I) {
+    var info = yield I.minibuffer.read_download($prompt = "Show download:");
+    download_show(I.window, OPEN_NEW_WINDOW, info);
+}
+
+function download_show_new_buffer (I) {
+    var info = yield I.minibuffer.read_download($prompt = "Show download:");
+    download_show(I.window, OPEN_NEW_BUFFER, info);
+}
+
+function download_show_new_buffer_background (I) {
+    var info = yield I.minibuffer.read_download($prompt = "Show download:");
+    download_show(I.window, OPEN_NEW_BUFFER_BACKGROUND, info);
+}
+
+function open_download_buffer_automatically (info) {
+    var buf = info.source_buffer;
+    var target = download_buffer_automatic_open_target;
+    if (info.temporary_status == DOWNLOAD_NOT_TEMPORARY ||
+        download_temporary_file_open_buffer_delay == 0)
+    {
+        download_show(buf.window, target, info);
+    } else {
+        var timer = null;
+        function finish () {
+            timer.cancel();
+        }
+        add_hook.call(info, "download_finished_hook", finish);
+        timer = call_after_timeout(function () {
+                remove_hook.call(info, "download_finished_hook", finish);
+                download_show(buf.window, target, info);
+            }, download_temporary_file_open_buffer_delay);
+    }
+}
+add_hook("download_added_hook", open_download_buffer_automatically);
+
 interactive("download-show",
     "Prompt for an ongoing download and open a download buffer showing "+
-    "its progress.  When called with universal argument, the second "+
-    "target from `download_buffer_automatic_open_target' will be used.",
-    function (I) {
-        var target = null;
-        if (I.P && typeof(download_buffer_automatic_open_target) == "object")
-            target = download_buffer_automatic_open_target[1];
-        open_download_buffer_automatically(
-            (yield I.minibuffer.read_download($prompt = "Show download:")),
-            target);
-    });
+    "its progress.",
+    alternates(download_show_new_buffer,
+               download_show_new_window));
 
+provide("download-manager");

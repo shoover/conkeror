@@ -6,8 +6,7 @@
  * COPYING file.
 **/
 
-const nav_history_service = Cc["@mozilla.org/browser/nav-history-service;1"]
-    .getService(Ci.nsINavHistoryService);
+in_module(null);
 
 define_keywords("$use_webjumps", "$use_history", "$use_bookmarks",
                 "$match_required");
@@ -54,16 +53,19 @@ function url_completer() {
     if(use_webjumps) {
         completers.push(webjump_completer());
     }
-    if(use_history || use_bookmarks) {
-        completers.push(history_completer($use_history = use_history,
-                                          $use_bookmarks = use_bookmarks));
-    }
+    /* Do queries separately (which can lead to duplicates).  The
+     * queries can be combined when QUERY_TYPE_UNIFIED is implemented. */
+    if (use_bookmarks)
+        completers.push(history_completer($use_bookmarks = true));
+    if (use_history)
+        completers.push(history_completer($use_history = true));
     return merge_completers(completers);
 }
 
-const nav_bookmarks_service = Cc["@mozilla.org/browser/nav-bookmarks-service;1"].getService(Ci.nsINavBookmarksService);
 
 function add_bookmark(url, title) {
     nav_bookmarks_service.insertBookmark(nav_bookmarks_service.unfiledBookmarksFolder,
                                          make_uri(url), -1, title);
 }
+
+provide("history");

@@ -6,7 +6,6 @@
  * COPYING file.
 **/
 
-require("bindings/default/content-buffer/normal.js");
 require("element.js");
 
 define_key(content_buffer_normal_keymap, "i", "browser-object-images");
@@ -14,6 +13,7 @@ define_key(content_buffer_normal_keymap, "n", "browser-object-links");
 define_key(content_buffer_normal_keymap, "m", "browser-object-frames");
 define_key(content_buffer_normal_keymap, "e", "browser-object-media");
 define_key(content_buffer_normal_keymap, "T", "browser-object-text");
+define_key(content_buffer_normal_keymap, "#", "browser-object-fragment-link");
 
 define_key(content_buffer_normal_keymap, "* e", "browser-object-media");
 define_key(content_buffer_normal_keymap, "* i", "browser-object-images");
@@ -24,6 +24,7 @@ define_key(content_buffer_normal_keymap, "* u", "browser-object-url");
 define_key(content_buffer_normal_keymap, "* a", "browser-object-alt");
 define_key(content_buffer_normal_keymap, "* t", "browser-object-title");
 define_key(content_buffer_normal_keymap, "* T", "browser-object-title-or-alt");
+define_key(content_buffer_normal_keymap, "* #", "browser-object-fragment-link");
 define_key(content_buffer_normal_keymap, "* *", "browser-object-dom-node");
 
 
@@ -48,6 +49,7 @@ define_key(content_buffer_normal_keymap, "x", "shell-command-on-file");
 define_key(content_buffer_normal_keymap, "X", "shell-command-on-url");
 define_key(content_buffer_normal_keymap, "b", "bookmark");
 define_key(content_buffer_normal_keymap, "v", "view-as-mime-type");
+define_key(content_buffer_normal_keymap, "d", "delete");
 
 
 // Scrolling

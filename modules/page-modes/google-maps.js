@@ -5,32 +5,43 @@
  * COPYING file.
 **/
 
+in_module(null);
+
 require("content-buffer.js");
 
-
-function google_maps_control(buffer, control) {
+function google_maps_control (buffer, xpath) {
     var doc = buffer.document;
-    let iter = doc.evaluate("//div[@log='" + control + "']",
+    var iter = doc.evaluate(xpath,
                             doc,
                             xpath_lookup_namespace,
                             Ci.nsIDOMXPathResult.FIRST_ORDERED_NODE_TYPE ,
                             null);
-    let node = iter.singleNodeValue;
-    if(node) {
+    var node = iter.singleNodeValue;
+    if (node) {
         var rect = node.getBoundingClientRect();
         dom_node_click(node, rect.left + 1, rect.top + 1);
     }
 }
 
-function define_google_maps_command(name, doc, control) {
+function define_google_maps_command (name, doc, control) {
     interactive("google-maps-" + name, doc, function(I) {
-                google_maps_control(I.buffer, control);
+                google_maps_control(I.buffer, "//div[@log='" + control + "']");
                 });
 }
 ignore_function_for_get_caller_source_code_reference("define_google_maps_command");
 
-define_google_maps_command('zoom-in', "Zoom in on a google map", 'zi');
-define_google_maps_command('zoom-out', "Zoom out of a google map", 'zo');
+function define_google_maps_zoom_command (name, doc, control_container) {
+    // In order to find the right element, this function abuses the fact
+    // that google provides mouse-over text for the buttons in the
+    // interface.
+    interactive("google-maps-" + name, doc, function(I) {
+                google_maps_control(I.buffer, "//div[@id='" + control_container + "']/div[@title]");
+       });
+}
+ignore_function_for_get_caller_source_code_reference("define_google_maps_zoom_command");
+
+define_google_maps_zoom_command('zoom-in', "Zoom in on a google map", 'lmcslider');
+define_google_maps_zoom_command('zoom-out', "Zoom out on a google map", 'lmczo');
 define_google_maps_command('pan-left', "Pan a google map left", 'pan_lt');
 define_google_maps_command('pan-right', "Pan a google map right", 'pan_rt');
 define_google_maps_command('pan-up', "Pan a google map up", 'pan_up');
@@ -62,3 +73,5 @@ define_page_mode("google_maps_mode",
 
 var google_maps_re = build_url_regex($domain = "maps.google");
 auto_mode_list.push([google_maps_re, google_maps_mode]);
+
+provide("google-maps");

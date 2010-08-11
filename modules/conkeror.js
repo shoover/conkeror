@@ -1,76 +1,90 @@
 /**
  * (C) Copyright 2007-2008 Jeremy Maitin-Shepard
- * (C) Copyright 2009 John J. Foerch
+ * (C) Copyright 2009-2010 John J. Foerch
  *
  * Use, modification, and distribution are subject to the terms specified in the
  * COPYING file.
 **/
 
+in_module(null);
+
 var start_time = Date.now();
 
-require("keywords.js");
-require("labels.js");
-require("coroutine.js");
-require("debug.js");
-require("hook.js");
-require("timer.js");
+require("keywords.js", null);
+require("labels.js", null);
+require("coroutine.js", null);
+require("debug.js", null);
+require("hook.js", null);
+require("timer.js", null);
+require("pretty-print.js", null);
+require("services.js", null);
 
-require("utils.js");
-require("interactive.js");
-require("minibuffer.js");
-require("minibuffer-read.js");
-require("minibuffer-read-option.js");
-require("minibuffer-completion.js");
-require("minibuffer-read-file.js");
-require("spawn-process.js");
-require("mime.js");
-require("keymap.js");
-require("input.js");
-require("buffer.js");
-require("window.js");
-require("content-handler.js");
-require("download-manager.js");
+require("string.js", null);
+require("pref.js", null);
+require("env.js", null);
+require("source-code.js", null);
+require("user-variable.js", null);
+require("stylesheet.js", null);
+require("array.js", null);
+require("builtin-commands.js", null);
+require("text.js", null);
 
-require("element.js");
+require("user-agent.js", null);
+require("utils.js", null);
+require("interactive.js", null);
+require("minibuffer.js", null);
+require("minibuffer-read.js", null);
+require("minibuffer-read-option.js", null);
+require("minibuffer-completion.js", null);
+require("minibuffer-read-file.js", null);
+require("spawn-process.js", null);
+require("mime.js", null);
+require("keymap.js", null);
+require("input.js", null);
+require("buffer.js", null);
+require("window.js", null);
+require("content-handler.js", null);
+require("download-manager.js", null);
 
-require("buffer.js")
-require("content-buffer.js");
-require("content-buffer-input.js");
-require("quote.js");
-require("caret.js");
+require("element.js", null);
 
-require("universal-argument.js");
-require("commands.js");
-require("webjump.js");
-require("history.js");
-require("scroll.js");
+require("content-buffer.js", null);
+require("content-buffer-input.js", null);
+require("quote.js", null);
+require("caret.js", null);
 
-require("save.js");
+require("universal-argument.js", null);
+require("commands.js", null);
+require("webjump.js", null);
+require("history.js", null);
+require("scroll.js", null);
 
-require("zoom.js");
-require("follow-relationship.js");
+require("save.js", null);
 
-require("find.js");
+require("zoom.js", null);
+require("follow-relationship.js", null);
 
-require("hints.js");
+require("isearch.js", null);
 
-require("help.js");
+require("hints.js", null);
 
-require("rc.js");
+require("help.js", null);
 
-require("ssl.js");
+require("rc.js", null);
 
-require("media.js");
+require("ssl.js", null);
 
-require("command-line.js");
+require("media.js", null);
 
-require("search-engine.js");
+require("command-line.js", null);
 
-require("permission-manager.js");
-require("cookie.js");
-require("cache.js");
+require("search-engine.js", null);
 
-require("theme.js");
+require("permission-manager.js", null);
+require("cookie.js", null);
+require("cache.js", null);
+
+require("theme.js", null);
 
 
 define_variable("cwd", get_home_directory(),
@@ -78,3 +92,11 @@ define_variable("cwd", get_home_directory(),
     "and shell-command directory.  It will often have a buffer-local "+
     "value.");
 
+
+/* Re-define load_paths as a user variable. */
+define_variable("load_paths", load_paths,
+    "Array of URL prefixes searched in order when loading a module.\n"+
+    "Each entry must end in a slash, and should begin with file:// or "+
+    "chrome://.");
+
+provide("conkeror");

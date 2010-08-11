@@ -6,9 +6,12 @@
  * COPYING file.
 **/
 
+in_module(null);
+
 require("mode.js");
 
 var define_window_local_hook = simple_local_hook_definer();
+var define_window_local_coroutine_hook = simple_local_coroutine_hook_definer();
 
 
 define_hook("make_window_hook");
@@ -69,10 +72,16 @@ function make_window (initial_buffer_creator, tag) {
     var result = make_chrome_window(conkeror_chrome_uri, null);
     result.args = args;
     make_window_hook.run(result);
-    result._close = result.close;
+    var close = result.close;
     result.close = function () {
-      if (window_before_close_hook.run(result))
-        result._close();
+        function attempt_close () {
+            var res = yield window_before_close_hook.run(result);
+            if (res) {
+                window_close_hook.run(result);
+                close.call(result);
+            }
+        }
+        co_call(attempt_close());
     };
     return result;
 }
@@ -98,7 +107,9 @@ function for_each_window (func) {
 }
 
 function get_recent_conkeror_window () {
-    var window = window_watcher.activeWindow;
+    var wm = Cc['@mozilla.org/appshell/window-mediator;1']
+       .getService(Ci.nsIWindowMediator);
+    var window = wm.getMostRecentWindow("navigator:browser");
     if (window && ("conkeror" in window))
         return window;
     var en = window_watcher.getWindowEnumerator();
@@ -181,22 +192,19 @@ function window_initialize (window) {
             delete window.args; // get rid of args
         }, 0);
 
-    window.addEventListener("close", window_close_maybe, true /* capture */);
+    window.addEventListener("close",
+                            function (event) {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                this.close();
+                            },
+                            true /* capture */);
 }
 
-define_window_local_hook("window_before_close_hook", RUN_HOOK_UNTIL_FAILURE);
+define_window_local_coroutine_hook("window_before_close_hook",
+                                   RUN_HOOK_UNTIL_FAILURE);
 define_window_local_hook("window_close_hook", RUN_HOOK);
-function window_close_maybe (event) {
-    var window = this;
 
-    if (!window_before_close_hook.run(window)) {
-        event.preventDefault();
-        event.stopPropagation();
-        return;
-    }
-
-    window_close_hook.run(window);
-}
 
 function define_global_window_mode (name, hook_name) {
     function install (window) {
@@ -265,3 +273,52 @@ function init_window_title () {
 }
 
 init_window_title();
+
+
+function call_builtin_command (window, command, clear_mark) {
+    var m = window.minibuffer;
+    if (m.active && m._input_mode_enabled) {
+        m._restore_normal_state();
+        var e = m.input_element;
+        var c = e.controllers.getControllerForCommand(command);
+        try {
+            if (c && c.isCommandEnabled(command))
+                c.doCommand(command);
+        } catch (e) {
+            // ignore errors
+        }
+        if (clear_mark)
+            m.current_state.mark_active = false;
+    } else {
+        function attempt_command (element) {
+            var c;
+            if (element.controllers
+                && (c = element.controllers.getControllerForCommand(command)) != null
+                && c.isCommandEnabled(command))
+            {
+                try {
+                    c.doCommand(command);
+                } catch (e) {
+                    // ignore errors
+                }
+                if (clear_mark)
+                    window.buffers.current.mark_active = false;
+                return true;
+            }
+            return false;
+        }
+        var element = window.buffers.current.focused_element;
+        if (element && attempt_command(element, command))
+            return;
+        var win = window.buffers.current.focused_frame;
+        while (true) {
+            if (attempt_command(win, command))
+                return;
+            if (!win.parent || win == win.parent)
+                break;
+            win = win.parent;
+        }
+    }
+}
+
+provide("window");

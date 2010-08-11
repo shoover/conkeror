@@ -1,4 +1,87 @@
-conkeror (0.9.1+git100113-1) unstable; urgency=low
+conkeror (0.9.2+git100804-1) unstable; urgency=low
+
+  * New upstream snapshot
+  * Bump Standards-Version to 3.9.1
+    - Use "Breaks" instead of "Conflicts".
+
+ -- Axel Beckert <abe@debian.org>  Wed, 04 Aug 2010 23:04:35 +0200
+
+conkeror (0.9.2+git100420-2) unstable; urgency=low
+
+  * The "forgotten details" upload
+  * Add appropriate NEWS entry with breaking changes for last upload.
+  * Renamed NEWS.Debian in the source package so that it will be
+    automatically installed as NEWS.Debian.
+  * Add "mentions Conkeror in the user agent string" to last changelog entry.
+
+ -- Axel Beckert <abe@debian.org>  Tue, 20 Apr 2010 23:34:00 +0200
+
+conkeror (0.9.2+git100420-1) unstable; urgency=low
+
+  * New upstream snapshot
+    - many xulrunner 1.9.2 compatibility fixes
+    - minibuffer overhaul
+    - mentions "Conkeror" in the user agent string
+
+ -- Axel Beckert <abe@debian.org>  Tue, 20 Apr 2010 17:42:01 +0200
+
+conkeror (0.9.2+git100324-2) unstable; urgency=low
+
+  * Further adaptions of the debian webjumps to the new module system as
+    suggested by John J. Foerch. Includes renaming the webjumps' file from
+    modules/debian/webjumps.js to modules/debian/debian-webjumps.js.
+
+ -- Axel Beckert <abe@debian.org>  Wed, 24 Mar 2010 23:45:50 +0100
+
+conkeror (0.9.2+git100324-1) unstable; urgency=low
+
+  * New upstream snapshot
+    - some minor bug fixes
+  * Refresh quilt patches (should have been done already for the last
+    upload)
+  * Adapt debian webjumps module to new module system (fixes lost default
+    webjumps in the previous upload). Thanks to gzeus for noticing!
+  * Add debian/source/format to silence lintian.
+
+ -- Axel Beckert <abe@debian.org>  Wed, 24 Mar 2010 01:27:57 +0100
+
+conkeror (0.9.2-1) unstable; urgency=low
+
+  * New upstream release
+    - Contains a new module system providing the capability for modules to
+      have their own namespace.
+
+ -- Axel Beckert <abe@debian.org>  Mon, 22 Mar 2010 19:11:32 +0100
+
+conkeror (0.9.1+git100317-1) unstable; urgency=low
+
+  * New upstream snapshot
+    - venkman support
+    - noscript support overhaul, now enabled by default
+    - fixes building conkeror-spawn-process-helper with clang compiler
+    - several new page modes
+    - many cosmetic changes and minor bugfixes
+    - outdated emacswiki webjump removed
+  * [debian/rules] Also install contrib/art
+
+ -- Axel Beckert <abe@debian.org>  Wed, 17 Mar 2010 01:49:54 +0100
+
+conkeror (0.9.1+git100220-1) unstable; urgency=low
+
+  * New upstream snapshot
+    - Honors cmdline.preventDefault as used since xulrunner 1.9.1.6-2
+  * Add support for the reportbug-helper-script of Debian's xulrunner
+    - Raise build-deps to debhelper >= 7.2.3~ due to dh_bugfiles
+  * Add alternative dependency on upcoming experimental xulrunner-1.9.2.
+  * Reorder xulrunner dependencies to have the current and preferred
+    versions first instead of sorting by package name. (Fixes piuparts
+    warning "dependency-does-not-exist".)
+  * Add a lintian override for the non-standard Xb-Xul-AppId header
+  * Removed Luca from the uploaders list (on his request)
+
+ -- Axel Beckert <abe@debian.org>  Sat, 20 Feb 2010 01:07:48 +0100
+
+conkeror (0.9.1+git100131-1) unstable; urgency=low
 
   * New upstream snapshot
   * Make package working on Ubuntu again by reverting debian/conkeror.bin
@@ -7,9 +90,17 @@ conkeror (0.9.1+git100113-1) unstable; urgency=low
   * Fix new Lintian 2.3.x warnings:
     - debhelper-but-no-misc-depends
     - obsolete-relation-form-in-source
-  * Add new webjump debpopcon.
+  * Add new Debian related webjumps:
+    - debpopcon
+    - buildd
+    - buildd-ports
+    - debqa
+  * Add Xb-Xul-AppId header to conkeror binary package for use with
+    mozilla-devscripts. (Closes: #562986)
+  * Bumped Standards-Version to 3.8.4 (no changes)
+  * Changed my e-mail address to my debian.org address
 
- -- Axel Beckert <abe@deuxchevaux.org>  Wed, 13 Jan 2010 01:44:01 +0100
+ -- Axel Beckert <abe@debian.org>  Sun, 31 Jan 2010 17:52:43 +0100
 
 conkeror (0.9.1-1) unstable; urgency=low
 

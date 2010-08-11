@@ -7,6 +7,8 @@
  * COPYING file.
 **/
 
+in_module(null);
+
 require("buffer.js");
 require("load-spec.js");
 
@@ -80,8 +82,14 @@ function content_buffer_modality (buffer) {
         buffer.keymaps.push(content_buffer_anchor_keymap);
         return;
     }
+    if (elem instanceof Ci.nsIDOMHTMLButtonElement) {
+        button_input_mode(buffer, true);
+        return;
+    }
     var frame = buffer.focused_frame;
-    if (frame && frame.document.designMode == "on") {
+    if (frame && frame.document.designMode &&
+        frame.document.designMode == "on")
+    {
         richedit_input_mode(buffer, true);
         return;
     }
@@ -99,13 +107,12 @@ function content_buffer_modality (buffer) {
 }
 
 
-/* If browser is null, create a new browser */
 define_keywords("$load");
-function content_buffer (window, element) {
+function content_buffer (window) {
     keywords(arguments);
     this.constructor_begin();
     try {
-        conkeror.buffer.call(this, window, element, forward_keywords(arguments));
+        conkeror.buffer.call(this, window, forward_keywords(arguments));
 
         this.browser.addProgressListener(this);
         var buffer = this;
@@ -172,7 +179,7 @@ function content_buffer (window, element) {
     }
 }
 content_buffer.prototype = {
-    constructor : content_buffer,
+    constructor: content_buffer,
 
     destroy: function () {
         this.browser.removeProgressListener(this);
@@ -187,7 +194,7 @@ content_buffer.prototype = {
     /* Used to display the correct URI when the buffer opens initially
      * even before loading has progressed far enough for currentURI to
      * contain the correct URI. */
-    _display_uri : null,
+    _display_uri: null,
 
     get display_uri_string () {
         if (this._display_uri)
@@ -200,13 +207,13 @@ content_buffer.prototype = {
     get title () { return this.browser.contentTitle; },
     get description () { return this.display_uri_string; },
 
-    load : function (load_spec) {
+    load: function (load_spec) {
         apply_load_spec(this, load_spec);
     },
 
     _request_count: 0,
 
-    loading : false,
+    loading: false,
 
     /* nsIWebProgressListener */
     QueryInterface: generate_QI(Ci.nsIWebProgressListener, Ci.nsISupportsWeakReference),
@@ -283,7 +290,7 @@ content_buffer.prototype = {
 
     /* This method is called to indicate a change to the current location.
        The url can be gotten as location.spec. */
-    onLocationChange : function (webProgress, request, location) {
+    onLocationChange: function (webProgress, request, location) {
         /* Attempt to ignore onLocationChange calls due to the initial
          * loading of about:blank by all xul:browser elements. */
         if (location.spec == "about:blank" && this.ignore_initial_blank)
@@ -334,8 +341,7 @@ content_buffer.prototype = {
     },
 
     /* Inherit from buffer */
-
-    __proto__ : buffer.prototype
+    __proto__: buffer.prototype
 };
 
 /*
@@ -429,7 +435,7 @@ minibuffer.prototype.read_url = function () {
         result = this.try_read_url_handlers(result);
     if (result == "") // well-formedness check. (could be better!)
         throw ("invalid url or webjump (\""+ result +"\")");
-    yield co_return(result);
+    yield co_return(load_spec(result));
 };
 /*
 I.content_charset = interactive_method(
@@ -531,6 +537,9 @@ function reload (b, bypass_cache, element, forced_charset) {
             } catch (e) {}
         }
         element.parentNode.replaceChild(element.cloneNode(true), element);
+    } else if (b.current_uri.spec != b.display_uri_string) {
+        apply_load_spec(b, load_spec({ uri: b.display_uri_string,
+                                       forced_charset: forced_charset }));
     } else {
         var flags = bypass_cache == null ?
             Ci.nsIWebNavigation.LOAD_FLAGS_NONE :
@@ -584,10 +593,10 @@ function browser_dom_window (window) {
     this.next_target = null;
 }
 browser_dom_window.prototype = {
+    constructor: browser_dom_window,
     QueryInterface: generate_QI(Ci.nsIBrowserDOMWindow),
 
-    openURI : function (aURI, aOpener, aWhere, aContext) {
-
+    openURI: function (aURI, aOpener, aWhere, aContext) {
         // Reference: http://www.xulplanet.com/references/xpcomref/ifaces/nsIBrowserDOMWindow.html
         var target = this.next_target;
         if (target == null || target == FOLLOW_DEFAULT)
@@ -603,11 +612,11 @@ browser_dom_window.prototype = {
         case FOLLOW_CURRENT_FRAME:
             return aOpener;
         case OPEN_NEW_BUFFER:
-            var buffer = new content_buffer(this.window, null /* element */, $opener = opener);
+            var buffer = new content_buffer(this.window, $opener = opener);
             this.window.buffers.current = buffer;
             return buffer.top_frame;
         case OPEN_NEW_BUFFER_BACKGROUND:
-            var buffer = new content_buffer(this.window, null /* element */, $opener = opener);
+            var buffer = new content_buffer(this.window, $opener = opener);
             return buffer.top_frame;
         case OPEN_NEW_WINDOW:
         default: /* shouldn't be needed */
@@ -669,3 +678,5 @@ function page_mode_auto_update (buffer) {
 }
 
 add_hook("content_buffer_location_change_hook", page_mode_auto_update);
+
+provide("content-buffer");

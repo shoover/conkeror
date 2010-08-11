@@ -1,6 +1,6 @@
 /**
  * (C) Copyright 2007-2008 Jeremy Maitin-Shepard
- * (C) Copyright 2009 John J. Foerch
+ * (C) Copyright 2009-2010 John J. Foerch
  *
  * Portions of this file are derived from Vimperator,
  * (C) Copyright 2006-2007 Martin Stubenschrott.
@@ -8,6 +8,8 @@
  * Use, modification, and distribution are subject to the terms specified in the
  * COPYING file.
 **/
+
+in_module(null);
 
 define_variable("active_img_hint_background_color", "#88FF00",
     "Color for the active image hint background.");
@@ -61,8 +63,8 @@ function hint_manager (window, xpath_expr, focused_frame, focused_element) {
     // Generate
     this.generate_hints();
 }
-
 hint_manager.prototype = {
+    constructor: hint_manager,
     current_hint_string: "",
     current_hint_number: -1,
 
@@ -98,7 +100,7 @@ hint_manager.prototype = {
 
             var doc = window.document;
             var res = doc.evaluate(xpath_expr, doc, xpath_lookup_namespace,
-                                   Ci.nsIDOMXPathResult.UNORDERED_NODE_ITERATOR_TYPE,
+                                   Ci.nsIDOMXPathResult.UNORDERED_NODE_SNAPSHOT_TYPE,
                                    null /* existing results */);
 
             var base_node = doc.createElementNS(XHTML_NS, "span");
@@ -106,26 +108,22 @@ hint_manager.prototype = {
 
             var fragment = doc.createDocumentFragment();
             var rect, elem, text, node, show_text;
-            while (true) {
-                try {
-                    elem = res.iterateNext();
-                    if (!elem)
-                        break;
-                } catch (e) {
-                    break; // Iterator may have been invalidated by page load activity
-                }
+            for (var j = 0; j < res.snapshotLength; j++) {
+                elem = res.snapshotItem(j);
                 rect = elem.getBoundingClientRect();
                 if (elem instanceof Ci.nsIDOMHTMLAreaElement) {
                     rect = { top: rect.top,
                              left: rect.left,
                              bottom: rect.bottom,
                              right: rect.right };
-                    var coords = elem.getAttribute("coords")
-                        .match(/^(-?\d+)\D+(-?\d+)/);
-                    if (coords.length == 3) {
-                        rect.left += parseInt(coords[1]);
-                        rect.top += parseInt(coords[2]);
-                    }
+                    try {
+                        var coords = elem.getAttribute("coords")
+                            .match(/^\D*(-?\d+)\D+(-?\d+)/);
+                        if (coords.length == 3) {
+                            rect.left += parseInt(coords[1]);
+                            rect.top += parseInt(coords[2]);
+                        }
+                    } catch (e) {}
                 }
                 if (!rect || rect.left > maxX || rect.right < minX || rect.top > maxY || rect.bottom < minY)
                     continue;
@@ -398,14 +396,14 @@ define_variable("hints_display_url_panel", false,
  * $abort_callback
  */
 define_keywords("$keymap", "$auto", "$hint_xpath_expression", "$multiple");
-function hints_minibuffer_state (window, continuation, buffer) {
+function hints_minibuffer_state (minibuffer, continuation, buffer) {
     keywords(arguments, $keymap = hint_keymap, $auto);
-    basic_minibuffer_state.call(this, window, $prompt = arguments.$prompt);
+    basic_minibuffer_state.call(this, minibuffer, $prompt = arguments.$prompt,
+                                $keymap = arguments.$keymap);
     if (hints_display_url_panel)
 	this.url_panel = hints_url_panel(this, buffer.window);
     this.original_prompt = arguments.$prompt;
     this.continuation = continuation;
-    this.keymap = arguments.$keymap;
     this.auto_exit = arguments.$auto ? true : false;
     this.xpath_expr = arguments.$hint_xpath_expression;
     this.auto_exit_timer_ID = null;
@@ -414,40 +412,40 @@ function hints_minibuffer_state (window, continuation, buffer) {
     this.focused_frame = buffer.focused_frame;
 }
 hints_minibuffer_state.prototype = {
+    constructor: hints_minibuffer_state,
     __proto__: basic_minibuffer_state.prototype,
     manager: null,
     typed_string: "",
     typed_number: "",
-    load: function (window) {
-        basic_minibuffer_state.prototype.load.call(this, window);
+    load: function () {
+        basic_minibuffer_state.prototype.load.call(this);
         if (!this.manager) {
-            var buf = window.buffers.current;
+            var buf = this.minibuffer.window.buffers.current;
             this.manager = new hint_manager(buf.top_frame, this.xpath_expr,
                                             this.focused_frame, this.focused_element);
         }
         this.manager.update_valid_hints();
-        this.window = window;
         if (this.url_panel)
             this.url_panel.update();
     },
     clear_auto_exit_timer: function () {
+        var window = this.minibuffer.window;
         if (this.auto_exit_timer_ID != null) {
-            this.window.clearTimeout(this.auto_exit_timer_ID);
+            window.clearTimeout(this.auto_exit_timer_ID);
             this.auto_exit_timer_ID = null;
         }
     },
-    unload: function (window) {
+    unload: function () {
         this.clear_auto_exit_timer();
         this.manager.hide_hints();
-        delete this.window;
-        basic_minibuffer_state.prototype.unload.call(this, window);
+        basic_minibuffer_state.prototype.unload.call(this);
     },
-    destroy: function (window) {
+    destroy: function () {
         this.clear_auto_exit_timer();
         this.manager.remove();
         if (this.url_panel)
             this.url_panel.destroy();
-        basic_minibuffer_state.prototype.destroy.call(this, window);
+        basic_minibuffer_state.prototype.destroy.call(this);
     },
     update_minibuffer: function (m) {
         if (this.typed_number.length > 0)
@@ -458,8 +456,8 @@ hints_minibuffer_state.prototype = {
             this.url_panel.update();
     },
 
-    handle_auto_exit: function (m, ambiguous) {
-        let window = m.window;
+    handle_auto_exit: function (ambiguous) {
+        var window = this.minibuffer.window;
         var num = this.manager.current_hint_number;
         if (!this.auto_exit)
             return;
@@ -470,12 +468,7 @@ hints_minibuffer_state.prototype = {
                                                         delay);
     },
 
-    ran_minibuffer_command: function (m) {
-        this.handle_input(m);
-    },
-
     handle_input: function (m) {
-        m._set_selection();
         this.clear_auto_exit_timer();
         this.typed_number = "";
         this.typed_string = m._input_text;
@@ -483,9 +476,9 @@ hints_minibuffer_state.prototype = {
         this.manager.current_hint_number = -1;
         this.manager.update_valid_hints();
         if (this.manager.valid_hints.length == 1)
-            this.handle_auto_exit(m, false /* unambiguous */);
+            this.handle_auto_exit(false /* unambiguous */);
         else if (this.manager.valid_hints.length > 1)
-        this.handle_auto_exit(m, true /* ambiguous */);
+        this.handle_auto_exit(true /* ambiguous */);
         this.update_minibuffer(m);
     }
 };
@@ -523,7 +516,7 @@ interactive("hints-handle-number", null,
             auto_exit_ambiguous = false;
         }
         if (auto_exit_ambiguous !== null)
-            s.handle_auto_exit(I.minibuffer, auto_exit_ambiguous);
+            s.handle_auto_exit(auto_exit_ambiguous);
         s.update_minibuffer(I.minibuffer);
     });
 
@@ -535,9 +528,9 @@ function hints_backspace (window, s) {
         var num = s.typed_number.length > 0 ? parseInt(s.typed_number) : 1;
         s.manager.select_hint(num);
     } else if (s.typed_string.length > 0) {
-        s.typed_string = s.typed_string.substring(0, s.typed_string.length - 1);
-        m._input_text = s.typed_string;
-        m._set_selection();
+        call_builtin_command(window, 'cmd_deleteCharBackward');
+        s.typed_string = m._input_text;
+        //m._set_selection();
         s.manager.current_hint_string = s.typed_string;
         s.manager.current_hint_number = -1;
         s.manager.update_valid_hints();
@@ -599,8 +592,10 @@ define_keywords("$buffer");
 minibuffer.prototype.read_hinted_element = function () {
     keywords(arguments);
     var buf = arguments.$buffer;
-    var s = new hints_minibuffer_state(this.window, (yield CONTINUATION), buf, forward_keywords(arguments));
+    var s = new hints_minibuffer_state(this, (yield CONTINUATION), buf, forward_keywords(arguments));
     this.push_state(s);
     var result = yield SUSPEND;
     yield co_return(result);
 };
+
+provide("hints");

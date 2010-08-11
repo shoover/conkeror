@@ -1,11 +1,13 @@
 /**
  * (C) Copyright 2004-2007 Shawn Betts
- * (C) Copyright 2007-2009 John J. Foerch
+ * (C) Copyright 2007-2010 John J. Foerch
  * (C) Copyright 2007-2008 Jeremy Maitin-Shepard
  *
  * Use, modification, and distribution are subject to the terms specified in the
  * COPYING file.
 **/
+
+in_module(null);
 
 /* Generate vk name table  */
 var keycode_to_vk_name = [];
@@ -402,13 +404,14 @@ sequence:
             for (var j = 0, pblen = pred_binds.length; j < pblen; j++) {
                 if (pred_binds[j].key == key) {
                     if (last_in_sequence && undefine_key)
-                        delete pred_binds[j];
+                        pred_binds.splice(j, 1);
                     else
                         replace_binding(pred_binds[j]);
                     continue sequence;
                 }
             }
-            pred_binds.push(make_binding());
+            if (! undefine_key)
+                pred_binds.push(make_binding());
         } else {
             // Check if the binding is already present in the keymap
             var bindings = kmap.bindings;
@@ -514,29 +517,24 @@ function define_fallthrough (keymap, predicate) {
 define_keymap("key_binding_reader_keymap");
 define_key(key_binding_reader_keymap, match_any_key, "read-key-binding-key");
 
-define_keywords("$buffer", "$keymap");
-function key_binding_reader (window, continuation) {
+define_keywords("$keymap");
+function key_binding_reader (minibuffer, continuation) {
     keywords(arguments, $prompt = "Describe key:");
-
+    minibuffer_input_state.call(this, minibuffer, key_binding_reader_keymap, arguments.$prompt);
     this.continuation = continuation;
-
     if (arguments.$keymap)
         this.target_keymap = arguments.$keymap;
-    else {
-        var buffer = arguments.$buffer;
-        this.target_keymap = get_current_keymaps(window);
-    }
-
+    else
+        this.target_keymap = get_current_keymaps(this.minibuffer.window).slice();
     this.key_sequence = [];
-
-    minibuffer_input_state.call(this, window, key_binding_reader_keymap, arguments.$prompt);
 }
 key_binding_reader.prototype = {
+    constructor: key_binding_reader,
     __proto__: minibuffer_input_state.prototype,
-    destroy: function (window) {
+    destroy: function () {
         if (this.continuation)
             this.continuation.throw(abort());
-        minibuffer_input_state.prototype.destroy.call(this, window);
+        minibuffer_input_state.prototype.destroy.call(this);
     }
 };
 
@@ -547,6 +545,7 @@ function invalid_key_binding (seq) {
     return e;
 }
 invalid_key_binding.prototype = {
+    constructor: invalid_key_binding,
     __proto__: interactive_error.prototype
 };
 
@@ -589,8 +588,10 @@ interactive("read-key-binding-key",
 
 minibuffer.prototype.read_key_binding = function () {
     keywords(arguments);
-    var s = new key_binding_reader(this.window, (yield CONTINUATION), forward_keywords(arguments));
+    var s = new key_binding_reader(this, (yield CONTINUATION), forward_keywords(arguments));
     this.push_state(s);
     var result = yield SUSPEND;
     yield co_return(result);
 };
+
+provide("keymap");

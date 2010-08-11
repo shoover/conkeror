@@ -42,21 +42,14 @@ pref("conkeror.load.mode-line", 1);
 pref("conkeror.load.daemon", 1);
 
 pref("conkeror.load.favicon", 1); // Enhances tab-bar mode
-pref("conkeror.load.tab-bar", 0);
-
-// Extension support modules
-// These modules will automatically skip loading if the associated extension is not enabled.
-pref("conkeror.load.extensions/dom-inspector", 1);
-pref("conkeror.load.extensions/adblockplus", 1);
 
 // Page mode modules
 pref("conkeror.load.page-modes/youtube", 1);
 pref("conkeror.load.page-modes/reddit", 1);
-pref("conkeror.load.page-modes/google-search-results", 0);
 pref("conkeror.load.page-modes/google-calendar", 1);
 pref("conkeror.load.page-modes/google-reader", 1);
 pref("conkeror.load.page-modes/google-video", 1);
 pref("conkeror.load.page-modes/google-maps", 1);
 pref("conkeror.load.page-modes/dailymotion", 1);
-pref("conkeror.load.page-modes/gmail", 0);
 pref("conkeror.load.page-modes/xkcd", 1);
+pref("conkeror.load.page-modes/stackoverflow", 1);

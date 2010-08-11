@@ -6,6 +6,8 @@
  * COPYING file.
 **/
 
+in_module(null);
+
 var command_line_handlers = [];
 
 define_variable("conkeror_started", false,
@@ -41,6 +43,20 @@ function load_url_in_new_buffer (url, ctx) {
                        $opener = ctx,
                        $load = url),
         OPEN_NEW_BUFFER, true /* focus the new window */);
+}
+
+/*
+ * load_url_in_new_buffer_background is a function intended for use as a
+ * value of `url_remoting_fn'.  Every url given on the command line will
+ * be loaded in a new background buffer in the most recently used window,
+ * or a new window if none exist.
+ */
+function load_url_in_new_buffer_background (url, ctx) {
+    create_buffer_in_current_window(
+        buffer_creator(content_buffer,
+                       $opener = ctx,
+                       $load = url),
+        OPEN_NEW_BUFFER_BACKGROUND, true /* focus the new window */);
 }
 
 /*
@@ -96,8 +112,10 @@ command_line_param_handler("f", true, function (command, ctx) {
 
 command_line_param_handler("l", false, function (path, ctx) {
         try {
-            load_rc(path, function(path) ctx.command_line.resolveFile(path));
-        } catch (e) { dump_error(e);  }
+            load(ctx.command_line.resolveFile(path));
+        } catch (e) {
+            dump_error(e);
+        }
     });
 
 // note `u' must be called as +u because Mozilla consumes -u
@@ -160,10 +178,12 @@ function handle_command_line (cmdline) {
 
         if (! suppress_rc && initial_launch) {
             try {
-                load_rc ();
-            } catch (e) { dump (e + "\n"); }
+                load_rc();
+            } catch (e) {
+                dump_error(e);
+            }
         } else if (suppress_rc && ! initial_launch) {
-            dumpln ("w: attempt to suppress load_rc in remote invocation");
+            dumpln("w: attempt to suppress loading of rc in remote invocation");
         }
         var ctx = new interactive_context();
         ctx.command_line = cmdline;
@@ -227,3 +247,4 @@ function handle_command_line (cmdline) {
     conkeror_started = true;
 }
 
+provide("command-line");
