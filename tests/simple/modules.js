@@ -104,6 +104,23 @@ walnut_run({
         assert_objects_equal(
             ["chrome://conkeror/content/foo.js"],
             this.ob);
+    },
+    test_load_search_5__relative_path: function () {
+        load_paths = ["chrome://conkeror/content/",
+                      "chrome://conkeror/content/extensions",
+                      "chrome://conkeror/content/page-modes"];
+        try {
+            load("page-modes/foo");
+        } catch (e) {
+        }
+        assert_objects_equal(
+            this.ob,
+            ["chrome://conkeror/content/page-modes/foo",
+             "chrome://conkeror/content/page-modes/foo.js",
+             "chrome://conkeror/content/extensions/page-modes/foo",
+             "chrome://conkeror/content/extensions/page-modes/foo.js",
+             "chrome://conkeror/content/page-modes/page-modes/foo",
+             "chrome://conkeror/content/page-modes/page-modes/foo.js"]);
     }
 });
 
@@ -303,5 +320,17 @@ walnut_run({
         features = {};
         provide("foo");
         assert(featurep("foo"));
+    },
+    test_load_relative_of_nsIURI: function () {
+        var tried = null;
+        load_url = function (url) {
+            if (url == "chrome://conkeror/content/foo.js") {
+                load("bar.js");
+            } else {
+                tried = url;
+            }
+        };
+        load(make_uri("chrome://conkeror/content/foo.js"));
+        assert_equals(tried, "chrome://conkeror/content/bar.js");
     }
 });

@@ -21,7 +21,6 @@ define_buffer_local_hook("content_buffer_progress_change_hook");
 define_buffer_local_hook("content_buffer_location_change_hook");
 define_buffer_local_hook("content_buffer_status_change_hook");
 define_buffer_local_hook("content_buffer_focus_change_hook");
-define_buffer_local_hook("content_buffer_overlink_change_hook");
 define_buffer_local_hook("content_buffer_dom_link_added_hook");
 define_buffer_local_hook("content_buffer_popup_blocked_hook");
 
@@ -30,80 +29,63 @@ define_current_buffer_hook("current_content_buffer_progress_change_hook", "conte
 define_current_buffer_hook("current_content_buffer_location_change_hook", "content_buffer_location_change_hook");
 define_current_buffer_hook("current_content_buffer_status_change_hook", "content_buffer_status_change_hook");
 define_current_buffer_hook("current_content_buffer_focus_change_hook", "content_buffer_focus_change_hook");
-define_current_buffer_hook("current_content_buffer_overlink_change_hook", "content_buffer_overlink_change_hook");
 
-
-define_input_mode("text", "content_buffer_text_keymap", $display_name = "input:TEXT");
-define_input_mode("textarea", "content_buffer_textarea_keymap", $display_name = "input:TEXTAREA");
-define_input_mode("richedit", "content_buffer_richedit_keymap", $display_name = "input:RICHEDIT");
-define_input_mode("select", "content_buffer_select_keymap", $display_name = "input:SELECT");
-define_input_mode("checkbox", "content_buffer_checkbox_keymap", $display_name = "input:CHECKBOX/RADIOBUTTON");
-define_input_mode("button", "content_buffer_button_keymap", $display_name = "input:BUTTON");
 
 function content_buffer_modality (buffer) {
     var elem = buffer.focused_element;
-    buffer.keymaps.push(content_buffer_normal_keymap);
+    function push_keymaps (tag) {
+        buffer.content_modalities.map(
+            function (m) {
+                if (m[tag])
+                    buffer.keymaps.push(m[tag]);
+            });
+        return null;
+    }
+    push_keymaps('normal');
     if (elem) {
         let p = elem.parentNode;
         while (p && !(p instanceof Ci.nsIDOMHTMLFormElement))
             p = p.parentNode;
         if (p)
-            buffer.keymaps.push(content_buffer_form_keymap);
+            push_keymaps('form');
     }
     if (elem instanceof Ci.nsIDOMHTMLInputElement) {
-        switch ((elem.getAttribute("type") || "").toLowerCase()) {
-        case "checkbox":
-            checkbox_input_mode(buffer, true);
-            break;
-        case "radio":
-            checkbox_input_mode(buffer, true);
-            break;
-        case "submit":
-            button_input_mode(buffer, true);
-            break;
-        case "reset":
-            button_input_mode(buffer, true);
-            break;
-        default:
-            text_input_mode(buffer, true);
-            break;
-        }
-        return;
+        var type = (elem.getAttribute("type") || "").toLowerCase();
+        if ({checkbox:1, radio:1, submit:1, reset:1}[type])
+            return push_keymaps(type);
+        else
+            return push_keymaps('text');
     }
-    if (elem instanceof Ci.nsIDOMHTMLTextAreaElement) {
-        textarea_input_mode(buffer, true);
-        return;
-    }
-    if (elem instanceof Ci.nsIDOMHTMLSelectElement) {
-        select_input_mode(buffer, true);
-        return;
-    }
-    if (elem instanceof Ci.nsIDOMHTMLAnchorElement) {
-        buffer.keymaps.push(content_buffer_anchor_keymap);
-        return;
-    }
-    if (elem instanceof Ci.nsIDOMHTMLButtonElement) {
-        button_input_mode(buffer, true);
-        return;
+    if (elem instanceof Ci.nsIDOMHTMLTextAreaElement)
+        return push_keymaps('textarea');
+    if (elem instanceof Ci.nsIDOMHTMLSelectElement)
+        return push_keymaps('select');
+    if (elem instanceof Ci.nsIDOMHTMLAnchorElement)
+        return push_keymaps('anchor');
+    if (elem instanceof Ci.nsIDOMHTMLButtonElement)
+        return push_keymaps('button');
+    if (elem instanceof Ci.nsIDOMHTMLEmbedElement ||
+        elem instanceof Ci.nsIDOMHTMLObjectElement)
+    {
+        return push_keymaps('embed');
     }
     var frame = buffer.focused_frame;
     if (frame && frame.document.designMode &&
         frame.document.designMode == "on")
     {
-        richedit_input_mode(buffer, true);
-        return;
+        return push_keymaps('richedit');
     }
     while (elem) {
         switch (elem.contentEditable) {
         case "true":
-            richedit_input_mode(buffer, true);
-            return;
+            return push_keymaps('richedit');
         case "false":
-            return;
+            return null;
         default: // "inherit"
             elem = elem.parentNode;
         }
     }
+    return null;
 }
 
 
@@ -127,27 +109,6 @@ function content_buffer (window) {
         this.browser.addEventListener("focus", function (event) {
             content_buffer_focus_change_hook.run(buffer, event);
         }, true /* capture */);
-
-        this.browser.addEventListener("mouseover", function (event) {
-            var node = event.target;
-            while (node && !(node instanceof Ci.nsIDOMHTMLAnchorElement))
-                node = node.parentNode;
-            if (node) {
-                content_buffer_overlink_change_hook.run(buffer, node.href);
-                buffer.current_overlink = event.target;
-            }
-        }, true /* capture */);
-
-        this.browser.addEventListener("mouseout", function (event) {
-            if (buffer.current_overlink == event.target) {
-                buffer.current_overlink = null;
-                content_buffer_overlink_change_hook.run(buffer, "");
-            }
-        }, true /* capture */);
-
-        // initialize buffer.current_overlink in case mouseout happens
-        // before mouseover.
-        buffer.current_overlink = null;
 
         this.browser.addEventListener("DOMLinkAdded", function (event) {
             content_buffer_dom_link_added_hook.run(buffer, event);
@@ -173,7 +134,21 @@ function content_buffer (window) {
         }
 
         this.modalities.push(content_buffer_modality);
-
+        this.content_modalities = [{
+            normal: content_buffer_normal_keymap,
+            form: content_buffer_form_keymap,
+            checkbox: content_buffer_checkbox_keymap,
+            radio: content_buffer_checkbox_keymap,
+            submit: content_buffer_button_keymap,
+            reset: content_buffer_button_keymap,
+            text: content_buffer_text_keymap,
+            textarea: content_buffer_textarea_keymap,
+            select: content_buffer_select_keymap,
+            anchor: content_buffer_anchor_keymap,
+            button: content_buffer_button_keymap,
+            embed: content_buffer_embed_keymap,
+            richedit: content_buffer_richedit_keymap
+        }];
     } finally {
         this.constructor_end();
     }
@@ -185,6 +160,8 @@ content_buffer.prototype = {
         this.browser.removeProgressListener(this);
         buffer.prototype.destroy.call(this);
     },
+
+    content_modalities: null,
 
     get scrollX () { return this.top_frame.scrollX; },
     get scrollY () { return this.top_frame.scrollY; },
@@ -437,44 +414,69 @@ minibuffer.prototype.read_url = function () {
         throw ("invalid url or webjump (\""+ result +"\")");
     yield co_return(load_spec(result));
 };
+
+
 /*
-I.content_charset = interactive_method(
-    $sync = function (ctx) {
-        var buffer = ctx.buffer;
-        if (!(buffer instanceof content_buffer))
-            throw new Error("Current buffer is of invalid type");
-        // -- Charset of content area of focusedWindow
-        var focusedWindow = buffer.focused_frame;
-        if (focusedWindow)
-            return focusedWindow.document.characterSet;
-        else
-            return null;
-    });
-*/
-/*
-I.content_selection = interactive_method(
-    $sync = function (ctx) {
-        // -- Selection of content area of focusedWindow
-        var focusedWindow = this.buffers.current.focused_frame;
-        return focusedWindow.getSelection ();
-    });
-*/
-function overlink_update_status (buffer, text) {
-    if (text.length > 0)
-        buffer.window.minibuffer.show("Link: " + text);
+ * Overlink Mode
+ */
+function overlink_update_status (buffer, node) {
+    if (node && node.href.length > 0)
+        buffer.window.minibuffer.show("Link: " + node.href);
     else
         buffer.window.minibuffer.show("");
 }
 
-define_global_mode("overlink_mode", function () {
-    add_hook("current_content_buffer_overlink_change_hook", overlink_update_status);
-}, function () {
-    remove_hook("current_content_buffer_overlink_change_hook", overlink_update_status);
-});
+function overlink_predicate (node) {
+    while (node && !(node instanceof Ci.nsIDOMHTMLAnchorElement))
+        node = node.parentNode;
+    return node;
+}
+
+function overlink_initialize (buffer) {
+    buffer.current_overlink = null;
+    buffer.overlink_mouseover = function (event) {
+        if (buffer != buffer.window.buffers.current)
+            return;
+        var node = overlink_predicate(event.target);
+        if (node) {
+            buffer.current_overlink = event.target;
+            overlink_update_status(buffer, node);
+        }
+    }
+    buffer.overlink_mouseout = function (event) {
+        if (buffer != buffer.window.buffers.current)
+            return;
+        if (buffer.current_overlink == event.target) {
+            buffer.current_overlink = null;
+            overlink_update_status(buffer, null);
+        }
+    }
+    buffer.browser.addEventListener("mouseover", buffer.overlink_mouseover, true);
+    buffer.browser.addEventListener("mouseout", buffer.overlink_mouseout, true);
+}
+
+define_global_mode("overlink_mode",
+    function enable () {
+        add_hook("create_buffer_hook", overlink_initialize);
+        for_each_buffer(overlink_initialize);
+    },
+    function disable () {
+        remove_hook("create_buffer_hook", overlink_initialize);
+        for_each_buffer(function (b) {
+            b.browser.removeEventListener("mouseover", b.overlink_mouseover, true);
+            b.browser.removeEventListener("mouseout", b.overlink_mouseout, true);
+            delete b.current_overlink;
+            delete b.overlink_mouseover;
+            delete b.overlink_mouseout;
+        });
+    })
 
 overlink_mode(true);
 
 
+/*
+ * Navigation Commands
+ */
 function go_back (b, prefix) {
     if (prefix < 0)
         go_forward(b, -prefix);

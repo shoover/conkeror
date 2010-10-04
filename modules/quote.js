@@ -8,11 +8,23 @@
 
 in_module(null);
 
-define_input_mode("quote_next", "quote_next_keymap",
-    $display_name = "input:QUOTE(next)",
-    $doc = "This input mode sends the next key combo to the buffer, "+
-        "bypassing Conkeror's normal key handling.  The mode disengages "+
-        "after one key combo.");
+define_buffer_mode('quote_next_mode',
+    $display_name = 'QUOTE-NEXT',
+    $enable = function (buffer) {
+        buffer.override_keymaps([quote_next_keymap]);
+    },
+    $disable = function (buffer) {
+        buffer.override_keymaps();
+    },
+    $doc = "This mode sends the next key combo to the buffer, bypassing "+
+        "normal key handling.  It disengages after one key combo.");
+
+interactive("quote-next-mode-disable",
+    "Disable quote-next-mode.",
+    function (I) {
+        quote_next_mode(I.buffer, false);
+        I.buffer.set_input_mode();
+    });
 
 
 define_buffer_mode('quote_mode',
@@ -35,14 +47,5 @@ interactive("quote-mode-disable",
         I.buffer.set_input_mode();
     });
 
-
-define_key_match_predicate('match_not_escape_key', 'any key but escape',
-    function (event) {
-        return event.keyCode != 27 ||
-             event.shiftKey ||
-             event.altKey ||
-             event.metaKey || // M-escape can also leave this mode, so we need to use an accurate determination of whether the "M" modifier was pressed, which is not necessarily the same as event.metaKey.
-             event.ctrlKey;
-    });
 
 provide("quote");

@@ -38,22 +38,19 @@ function open_link_in_new_buffer (event) {
         return;
     let element = event.target;
     let anchor = null;
-    if (element instanceof Ci.nsIDOMHTMLAnchorElement)
-        anchor = element;
-    // FIXME The 'tostring() ==' is a terrible kludge.
-    else if (element.wrappedJSObject.toString() == "[object HTMLSpanElement]" ||
-             element instanceof Ci.nsIDOMHTMLImageElement)
+    if (element instanceof Ci.nsIDOMHTMLAnchorElement ||
+        element instanceof Ci.nsIDOMHTMLAreaElement)
     {
+        anchor = element;
+    } else
         anchor = find_tag_in_parents("a", element);
-    }
     if (anchor == null)
         return;
     event.preventDefault();
     if (clicks_in_new_buffer_ev_stop_prop)
         event.stopPropagation();
     let spec = load_spec(anchor);
-    // FIXME Is there a better way to get the window?
-    let window = window_watcher.activeWindow;
+    let window = this.ownerDocument.defaultView;
     let buffer = window.buffers.current;
     create_buffer(window,
                   buffer_creator(content_buffer, $load = spec),

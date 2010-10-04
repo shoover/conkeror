@@ -144,7 +144,8 @@ function unformat_key_combo (combo) {
  * Keymap datatype
  */
 
-define_keywords("$parent", "$help", "$name", "$anonymous");
+define_keywords("$parent", "$help", "$name", "$anonymous",
+                "$display_name", "$notify");
 function keymap () {
     keywords(arguments);
     this.parent = arguments.$parent;
@@ -153,6 +154,8 @@ function keymap () {
     this.fallthrough = [];
     this.help = arguments.$help;
     this.name = arguments.$name;
+    this.display_name = arguments.$display_name;
+    this.notify = arguments.$notify;
     this.anonymous = arguments.$anonymous;
 }
 
@@ -212,6 +215,19 @@ define_key_match_predicate('match_text_keys', 'text editing keys',
         //XXX: keycode fallthroughs don't support sticky modifiers
     });
 
+define_key_match_predicate('match_not_escape_key', 'any key but escape',
+    function (event) {
+        return event.keyCode != 27 ||
+             event.shiftKey ||
+             event.altKey ||
+             event.metaKey || // M-escape can also leave this mode, so we
+                              // need to use an accurate determination of
+                              // whether the "M" modifier was pressed,
+                              // which is not necessarily the same as
+                              // event.metaKey.
+             event.ctrlKey;
+    });
+
 
 /*
  */
@@ -236,6 +252,8 @@ function format_binding_sequence (seq) {
 
 function keymap_lookup (keymaps, combo, event) {
     var i = keymaps.length - 1;
+    if (i < 0)
+        return null;
     var kmap = keymaps[i];
     var new_kmaps;
     while (true) {
