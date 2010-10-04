@@ -108,8 +108,8 @@ const STDERR_FILENO = 2;
 var spawn_process_helper_default_fd_wait_timeout = 1000;
 var spawn_process_helper_setup_timeout = 2000;
 var spawn_process_helper_program = file_locator_service.get("CurProcD", Ci.nsIFile);
+//spawn_process_helper_program.append("conkeror-spawn-helper");
 spawn_process_helper_program.append("conkeror-spawn-helper.exe");
-spawn_process_helper_program.append("conkeror-spawn-helper");
 
 /**
  * @param program_name
@@ -633,6 +633,8 @@ function shell_command (command) {
         throw new Error("shell_command: Your OS is not yet supported");
     var result = yield spawn_and_wait_for_process(getenv("SHELL") || "/bin/sh",
                                                   [null, "-c", command],
+    //var result = yield spawn_and_wait_for_process(command,
+    //                                              [null],
                                                   forward_keywords(arguments));
     yield co_return(result);
 }
